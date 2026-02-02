@@ -158,6 +158,7 @@ var Main_update_show_toast = false;
 var Main_IsOn_OSInterfaceVersion = '';
 var Main_ClockOffset = 0;
 var Main_IsOn_OSInterface = 0;
+var Main_IsDesktop = typeof Main_IsDesktop !== 'undefined' ? Main_IsDesktop : false; // Set by DesktopInterface.js
 var Main_randomImg = '?' + Math.random();
 
 var Main_Scene1Doc;
@@ -236,10 +237,24 @@ function Main_StartApp() {
             Main_isDebug = OSInterface_getdebug();
             Main_IsOn_OSInterface = Main_IsOn_OSInterfaceVersion !== '';
 
+            // Check if running on desktop (Tauri)
+            Main_IsDesktop = window.__TAURI__ !== undefined || window.__TAURI_INTERNALS__ !== undefined ||
+                            (Main_IsOn_OSInterfaceVersion && Main_IsOn_OSInterfaceVersion.indexOf('Desktop') !== -1) ||
+                            (Main_IsOn_OSInterfaceVersion && Main_IsOn_OSInterfaceVersion.indexOf('Tauri') !== -1);
+
+            if (Main_IsDesktop) {
+                // Desktop-specific initialization
+                KEY_RETURN = 27; // Use Escape key for back/return
+                Main_AddClass('scenefeed', 'feed_screen_input');
+                Main_HideElement('scene_keys'); // Hide virtual D-pad
+                console.log('[Main] Desktop mode detected:', Main_IsOn_OSInterfaceVersion);
+            }
+
             OSInterface_setAppIds(AddCode_backup_client_id, null, null);
         } catch (e) {
             Main_IsOn_OSInterfaceVersion = version.VersionBase + '.' + version.publishVersionCode;
             Main_IsOn_OSInterface = 0;
+            Main_IsDesktop = false;
             Main_body.style.backgroundColor = 'rgba(155, 155, 155, 1)'; //default rgba(0, 0, 0, 1)
             Main_isDebug = true;
             //Main_Log('Main_isDebug: ' + Main_isDebug);

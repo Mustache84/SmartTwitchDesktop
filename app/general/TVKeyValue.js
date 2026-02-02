@@ -18,13 +18,14 @@
  *
  */
 
-//https://developer.android.com/reference/android/view/KeyEvent
-//overwrite from java dispatchKeyEvent()
-var KEY_PAUSE = 83; //overwrite key S = stop because p = play
-var KEY_PLAY = 80; //overwrite key P = play
+// Desktop keyboard key codes
+// Standard keyboard navigation for desktop application
 
-var KEY_STOP = 178;
-var KEY_PLAYPAUSE = 179;
+var KEY_PAUSE = 83; // S key - stop/pause
+var KEY_PLAY = 80;  // P key - play
+
+var KEY_STOP = 178;      // Media Stop
+var KEY_PLAYPAUSE = 179; // Media Play/Pause
 
 var KEY_LEFT = 37;
 var KEY_UP = 38;
@@ -35,7 +36,7 @@ var KEY_ENTER = 13;
 var KEY_PG_DOWN = 34;
 var KEY_PG_UP = 33;
 
-var KEY_RETURN = 113; //key #F2
+var KEY_RETURN = 27; // Escape key - back/cancel
 
 var KEY_KEYBOARD_BACKSPACE = 8; // http://developer.samsung.com/tv/develop/guides/user-interaction/keyboardime
 var KEY_KEYBOARD_DONE = 13;
