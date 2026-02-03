@@ -1,456 +1,493 @@
-# SmartTwitchTV Desktop Fork - Implementation Plan
+# SmartTwitch Desktop - Implementation Plan
 
 ## Overview
 
-This document outlines the complete plan to fork SmartTwitchTV from an Android/TV app to a native desktop application using Tauri. The goal is to remove all Android-specific code while preserving all user-facing features.
+This document outlines the complete plan to transform SmartTwitchTV from an Android/TV app into a **native Tauri desktop application**. The goal is to **completely remove all Android architecture** and rebuild features natively for desktop with full hardware acceleration support (including NVIDIA RTX Video Super Resolution), proper keyboard/mouse controls, transparent chat overlay, multi-stream support, and native notifications.
+
+**Key Principles:**
+- No Android shims or compatibility layers
+- Native desktop experience with keyboard/mouse (no TV remote support)
+- Hardware-accelerated video with RTX Video SR compatibility
+- Full feature parity with Android app, rebuilt natively
+
+---
 
 ## Architecture
 
 ```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Operating System                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  NVIDIA Driver (RTX Video SR)  ←── Intercepts decoded video frames  │
+│           ↑                                                          │
+│  DXVA2 / VideoToolbox / VA-API  ←── Hardware video decode           │
+├─────────────────────────────────────────────────────────────────────┤
+│                     Tauri + WebView2                                 │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  Rust Backend                                                 │  │
+│  │  ├── HTTP proxy (CORS bypass for Twitch/HLS)                  │  │
+│  │  ├── Window management (fullscreen, minimize, close)          │  │
+│  │  ├── Hardware acceleration control (--disable-gpu flag)       │  │
+│  │  ├── Native notifications (tauri-plugin-notification)         │  │
+│  │  ├── Clipboard operations                                     │  │
+│  │  └── GPU detection (RTX Video hints)                          │  │
+│  ├───────────────────────────────────────────────────────────────┤  │
+│  │  JavaScript Frontend                                          │  │
+│  │  ├── DesktopPlayer.js      ←── Core HLS.js player             │  │
+│  │  ├── DesktopMultiPlayer.js ←── Multi-stream/PiP (4 instances) │  │
+│  │  ├── DesktopPreview.js     ←── Hover preview with audio       │  │
+│  │  ├── DesktopControls.js    ←── Keyboard/mouse handler         │  │
+│  │  ├── DesktopNotifications.js ←── Polling + native notify      │  │
+│  │  └── DesktopInterface.js   ←── Minimal Tauri bridge           │  │
+│  ├───────────────────────────────────────────────────────────────┤  │
+│  │  Video Elements (hardware-decoded)                            │  │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐         │  │
+│  │  │ Primary  │ │   PiP    │ │ Multi x4 │ │ Preview  │         │  │
+│  │  │  Video   │ │  Video   │ │  Videos  │ │  Video   │         │  │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘         │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Feature Set
+
+### Playback Features
+| Feature | Implementation | Status |
+|---------|---------------|--------|
+| Live Stream Playback | HLS.js with Tauri HTTP proxy | 🔄 Partial |
+| VOD Playback | HLS.js with seek support | 🔄 Partial |
+| Clip Playback | HLS.js or direct MP4 | 🔄 Partial |
+| Quality Selection | HLS.js levels API | 🔄 Partial |
+| Auto Quality (ABR) | HLS.js auto level switching | 🔄 Partial |
+| Low Latency Mode | HLS.js `lowLatencyMode: true` | ⬜ Not started |
+| Latency Catch-Up | Playback rate adjustment | ⬜ Not started |
+| Playback Speed | `video.playbackRate` | ⬜ Not started |
+| Picture-in-Picture | Second HLS.js instance | ⬜ Not started |
+| 50/50 Split View | Two HLS.js instances | ⬜ Not started |
+| Quad Multi-Stream | Four HLS.js instances | ⬜ Not started |
+| VOD Resume | localStorage position save | ⬜ Not started |
+| Hardware Acceleration | WebView2 default + toggle | ⬜ Not started |
+| RTX Video SR | Automatic (driver-level) | ⬜ Not started |
+
+### Chat Features
+| Feature | Implementation | Status |
+|---------|---------------|--------|
+| Live Chat (IRC) | Browser WebSocket | ✅ Working |
+| VOD Chat | Twitch API replay | ✅ Working |
+| Transparent Overlay | CSS with opacity control | ⬜ Not started |
+| Position Presets | 6 positions (corners + sides) | ⬜ Not started |
+| Width Control | Narrow/Medium/Wide | ⬜ Not started |
+| BTTV/FFZ/7TV Emotes | Existing implementation | ✅ Working |
+
+### Controls
+| Feature | Implementation | Status |
+|---------|---------------|--------|
+| Keyboard Shortcuts | DesktopControls.js | ⬜ Not started |
+| Mouse Controls | Click/scroll handlers | ⬜ Not started |
+| Media Keys | Space, arrows, M, F | ⬜ Not started |
+| Native Fullscreen | Tauri window API | ⬜ Not started |
+
+### Desktop Features
+| Feature | Implementation | Status |
+|---------|---------------|--------|
+| Native Notifications | tauri-plugin-notification | ⬜ Not started |
+| Live Alert Polling | 60s interval (configurable) | ⬜ Not started |
+| Preview on Hover | Lightweight HLS.js + audio | ⬜ Not started |
+| Settings Persistence | localStorage | ✅ Working |
+| OAuth Login | Device code flow | ✅ Working |
+
+---
+
+## Milestones
+
+### Milestone 1: Video Foundation ✅ COMPLETE
+**Goal:** Working single-stream video playback with proper DOM structure
+
+**Deliverables:**
+- [x] Video DOM elements in index.html with proper attributes
+- [x] player.css with z-index layering and layouts
+- [x] Bundled HLS.js v1.5.x in thirdparty/
+- [x] Basic DesktopPlayer.js with Tauri HTTP proxy loaders
+
+**Success Criteria:** Can play a Twitch live stream with video visible and controllable
+
+**Files Created/Modified:**
+- `app/css/player.css` - Video container layouts, chat overlay, loading states
+- `app/thirdparty/hls.min.js` - HLS.js v1.5.7 bundled locally
+- `app/specific/DesktopPlayer.js` - Core player module with HLS.js integration
+- `app/index.html` - Added video elements, CSS link, script includes
+
+---
+
+### Milestone 2: Hardware Acceleration
+**Goal:** GPU-accelerated video with user toggle and RTX Video compatibility
+
+**Deliverables:**
+- [ ] Rust startup reads hw_accel setting from app data
+- [ ] `--disable-gpu` flag passed to WebView2 when disabled
+- [ ] `get_gpu_info` Tauri command for NVIDIA detection
+- [ ] Settings UI toggle with restart-required prompt
+- [ ] RTX Video hint displayed when NVIDIA GPU detected
+
+**Success Criteria:** Hardware decode working, RTX Video SR activates when enabled in NVIDIA Control Panel
+
+---
+
+### Milestone 3: Desktop Controls
+**Goal:** Full keyboard and mouse control of video playback
+
+**Deliverables:**
+- [ ] DesktopControls.js with all keyboard shortcuts
+- [ ] Mouse click/double-click/scroll handlers
+- [ ] Native OS fullscreen via Tauri
+- [ ] Volume persistence to localStorage
+- [ ] Focus management for keyboard events
+
+**Keyboard Shortcuts:**
+| Key | Action |
+|-----|--------|
+| Space | Play/Pause |
+| ← / → | Seek ±10s |
+| Shift+← / Shift+→ | Seek ±30s |
+| ↑ / ↓ | Volume ±10% |
+| M | Mute toggle |
+| F | Fullscreen toggle |
+| Escape | Exit fullscreen / Close overlay / Back |
+| C | Chat visibility toggle |
+| Shift+C | Cycle chat position |
+| T | Theater mode toggle |
+| 1-9 | Quality selection |
+
+**Success Criteria:** All shortcuts working, mouse controls responsive
+
+---
+
+### Milestone 4: Chat Overlay System
+**Goal:** Transparent, repositionable chat overlay on video
+
+**Deliverables:**
+- [ ] Chat container with configurable opacity (0-100%)
+- [ ] 6 position presets (Right, Left, Top-Right, Top-Left, Bottom-Right, Bottom-Left)
+- [ ] Width options (Narrow, Medium, Wide)
+- [ ] Keyboard shortcut C to toggle, Shift+C to cycle position
+- [ ] Settings UI for opacity and position
+- [ ] Chat z-index above video, below controls
+
+**Chat Overlay Layout:**
+```
 ┌─────────────────────────────────────────────────────────────┐
-│  Tauri Shell (Rust)                                         │
-│  ├── Window management                                      │
-│  ├── Global hotkeys                                         │
-│  ├── System tray (optional)                                 │
-│  ├── Auto-updater (GitHub releases)                         │
-│  └── CORS proxy for Twitch API                              │
-├─────────────────────────────────────────────────────────────┤
-│  Desktop Interface Layer (DesktopInterface.js)              │
-│  ├── Replaces OSInterface.js                                │
-│  ├── Direct browser APIs where possible                     │
-│  └── Tauri invoke() for native features                     │
-├─────────────────────────────────────────────────────────────┤
-│  HLS.js Player                                              │
-│  ├── Quality selection (manual + ABR)                       │
-│  ├── Low-latency mode                                       │
-│  ├── Playback speed control                                 │
-│  └── Multi-instance support (for future multi-stream)       │
-├─────────────────────────────────────────────────────────────┤
-│  SmartTwitchTV Web App (Modified)                           │
-│  ├── Main.js (platform detection: Main_IsDesktop)           │
-│  ├── Play*.js (adapted for HLS.js)                          │
-│  ├── Chat*.js (unchanged)                                   │
-│  └── UI/Screens (keyboard navigation adapted)               │
+│                    Video Player (z-index: 100)              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                    Stream Video                       │  │
+│  │                                       ┌─────────────┐ │  │
+│  │                                       │ Chat Overlay│ │  │
+│  │                                       │ (z-index:   │ │  │
+│  │                                       │  110)       │ │  │
+│  │                                       │ Transparent │ │  │
+│  │                                       │ Background  │ │  │
+│  │                                       └─────────────┘ │  │
+│  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## Phase 1: Foundation (Current State → Working Desktop App)
-
-### 1.1 Platform Detection
-**Files:** `Main.js`
-
-Replace Android detection with desktop detection:
-```javascript
-// OLD
-Main_IsOn_OSInterface = OSInterface_getversion() !== '';
-
-// NEW
-Main_IsDesktop = window.__TAURI__ !== undefined;
-Main_IsOn_OSInterface = false; // Disable Android path entirely
-```
-
-### 1.2 Create DesktopInterface.js
-**New File:** `app/specific/DesktopInterface.js`
-
-This replaces `OSInterface.js` with clean desktop implementations:
-
-| Function | Implementation |
-|----------|---------------|
-| HTTP requests | `fetch()` + Tauri CORS proxy |
-| Clipboard | `navigator.clipboard` API |
-| Playback control | HLS.js API |
-| Quality selection | HLS.js levels API |
-| Volume | HTML5 `<video>.volume` |
-| Close/Minimize | Tauri window API |
-
-### 1.3 Keyboard Input Normalization
-**File:** `TVKeyValue.js`
-
-Remove TV remote key codes, use standard keyboard:
-```javascript
-var KEY_ENTER = 13;      // Enter
-var KEY_RETURN = 27;     // Escape (back/cancel)
-var KEY_UP = 38;
-var KEY_DOWN = 40;
-var KEY_LEFT = 37;
-var KEY_RIGHT = 39;
-var KEY_KEYBOARD_BACKSPACE = 8;
-// Remove: KEY_RED, KEY_GREEN, KEY_YELLOW, KEY_BLUE, etc.
-```
-
-### 1.4 Remove Android Bridge
-**Delete:** `src-tauri/bridge/android-bridge.js`
-**Modify:** `src-tauri/src/lib.rs` - Remove bridge injection
+**Success Criteria:** Chat overlays video with transparency, position changes work smoothly
 
 ---
 
-## Phase 2: Player Implementation (HLS.js)
+### Milestone 5: Android Code Removal
+**Goal:** Clean codebase with no Android/TV remnants
 
-### 2.1 Add HLS.js Dependency
-**File:** `index.html` or bundled
+**Deliverables:**
+- [ ] Remove TV remote/D-pad handling from Main.js
+- [ ] Delete all `OSInterface_*` shim functions from DesktopInterface.js
+- [ ] Remove Android settings from Settings.js (ExoPlayer buffers, codec blacklists)
+- [ ] Delete BrowserTest.js
+- [ ] Clean language files of Android/TV strings
+- [ ] Remove APK update logic
+- [ ] Remove notification service stubs
 
-```html
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-```
-
-### 2.2 Create Desktop Player Module
-**New File:** `app/specific/PlayDesktop.js`
-
-Core player implementation using HLS.js:
-
-```javascript
-var DesktopPlayer = {
-    hls: null,
-    video: null,
-
-    init: function(videoElement) {
-        this.video = videoElement;
-        if (Hls.isSupported()) {
-            this.hls = new Hls({
-                lowLatencyMode: true,
-                enableWorker: true,
-                backBufferLength: 90
-            });
-        }
-    },
-
-    loadStream: function(url, playlistContent) {
-        // Load HLS stream
-    },
-
-    setQuality: function(levelIndex) {
-        // -1 for auto, else specific level
-        this.hls.currentLevel = levelIndex;
-    },
-
-    getQualities: function() {
-        return this.hls.levels.map((level, i) => ({
-            index: i,
-            height: level.height,
-            bitrate: level.bitrate
-        }));
-    },
-
-    setLatencyMode: function(mode) {
-        // Configure low latency
-    },
-
-    setPlaybackSpeed: function(speed) {
-        this.video.playbackRate = speed;
-    }
-};
-```
-
-### 2.3 Adapt Play.js, PlayVod.js, PlayClip.js
-**Files:** `Play.js`, `PlayVod.js`, `PlayClip.js`, `PlayHLS.js`, `PlayEtc.js`
-
-Replace `OSInterface_*` player calls with `DesktopPlayer.*`:
-
-| Old Call | New Call |
-|----------|----------|
-| `OSInterface_StartAuto()` | `DesktopPlayer.loadStream()` |
-| `OSInterface_stopVideo()` | `DesktopPlayer.stop()` |
-| `OSInterface_SetQuality()` | `DesktopPlayer.setQuality()` |
-| `OSInterface_getQualities()` | `DesktopPlayer.getQualities()` |
-| `OSInterface_mseekTo()` | `DesktopPlayer.seek()` |
-| `OSInterface_gettime()` | `DesktopPlayer.getCurrentTime()` |
-| `OSInterface_setPlaybackSpeed()` | `DesktopPlayer.setPlaybackSpeed()` |
-
-### 2.4 Features to Implement
-- [ ] Quality selection (manual + auto)
-- [ ] Low latency mode with catch-up
-- [ ] Playback speed (0.25x - 2x)
-- [ ] Fast forward/rewind (5s, 30s jumps)
-- [ ] Volume control
-- [ ] Mute toggle
-- [ ] Fullscreen toggle
+**Success Criteria:** Grep for "Android", "ExoPlayer", "OSInterface_" returns zero results in app code
 
 ---
 
-## Phase 3: Code Removal (Android-Specific)
+### Milestone 6: Preview Player
+**Goal:** Hover preview on channel thumbnails with audio
 
-### 3.1 Files to DELETE Entirely
-None - we'll modify in place to preserve git history
+**Deliverables:**
+- [ ] DesktopPreview.js with lightweight HLS.js instance
+- [ ] 300ms hover delay before preview starts
+- [ ] **Audio enabled** (not muted) - true preview
+- [ ] Main player audio paused while preview active
+- [ ] 200ms grace period on mouse leave
+- [ ] Force low quality (480p) for performance
+- [ ] Preview positioned near thumbnail
 
-### 3.2 Functions to REMOVE from OSInterface.js → DesktopInterface.js
-
-**Notification System (Android background service):**
-- `OSInterface_StopNotificationService`
-- `OSInterface_SetNotificationPosition`
-- `OSInterface_SetNotificationRepeat`
-- `OSInterface_SetNotificationSinceTime`
-- `OSInterface_RunNotificationService`
-- `OSInterface_upNotificationState`
-- `OSInterface_SetNotificationLive`
-- `OSInterface_SetNotificationTitle`
-- `OSInterface_SetNotificationGame`
-
-**APK/Update System:**
-- `OSInterface_getInstallFromPLay`
-- `OSInterface_UpdateAPK`
-- `OSInterface_CleanAndLoadUrl`
-
-**Android System:**
-- `OSInterface_mhideSystemUI`
-- `OSInterface_keyEvent`
-- `OSInterface_KeyboardCheckAndHIde`
-- `OSInterface_hideKeyboardFrom`
-- `OSInterface_isAccessibilitySettingsOn`
-- `OSInterface_mKeepScreenOn`
-- `OSInterface_AvoidClicks`
-- `OSInterface_initbodyClickSet`
-- `OSInterface_SetKeysOpacity`
-- `OSInterface_SetKeysPosition`
-
-**Android Device Info:**
-- `OSInterface_getSDK`
-- `OSInterface_deviceIsTV`
-- `OSInterface_getcodecCapabilities`
-- `OSInterface_setBlackListMediaCodec`
-- `OSInterface_setBlackListQualities`
-- `OSInterface_getWebviewVersion` (replace with browser UA)
-
-**ExoPlayer Specific:**
-- `OSInterface_RestartPlayer`
-- `OSInterface_ReuseFeedPlayer`
-- `OSInterface_ReuseFeedPlayerPrepare`
-- `OSInterface_FixViewPosition`
-- `OSInterface_msetPlayer`
-- `OSInterface_SetCheckSource`
-- `OSInterface_mCheckRefresh`
-- `OSInterface_mCheckRefreshToast`
-- `OSInterface_getVideoStatus`
-- `OSInterface_getVideoQuality`
-- `OSInterface_mshowLoading`
-- `OSInterface_mshowLoadingBottom`
-
-### 3.3 Update Main.js
-
-Remove/modify:
-- APK update check logic (~lines 1160-1320)
-- TV detection logic
-- Android-specific key mapping
-- ExoPlayer status handling
-
-### 3.4 Update Settings.js
-
-Remove settings for:
-- Notification service configuration
-- ExoPlayer buffer settings
-- Codec blacklists
-- TV-specific UI options
+**Success Criteria:** Hovering over channel shows live preview with audio, smooth transitions
 
 ---
 
-## Phase 4: Desktop Features
+### Milestone 7: Multi-Stream & PiP
+**Goal:** Watch multiple streams simultaneously
 
-### 4.1 In-App Notifications
-**File:** `app/specific/Notifications.js` (new)
+**Deliverables:**
+- [ ] DesktopMultiPlayer.js managing up to 4 HLS.js instances
+- [ ] PiP mode: Corner overlay (draggable, resizable)
+- [ ] 50/50 split: Side-by-side layout
+- [ ] Quad view: 2x2 grid
+- [ ] Audio focus: Only one stream has audio, click to switch
+- [ ] Independent quality per stream
+- [ ] Chat switches to focused channel
 
-Overlay notifications when streamers go live:
-```javascript
-var DesktopNotifications = {
-    show: function(message, duration) {
-        // Create overlay div above player
-        // Auto-dismiss after duration
-    },
-
-    showLive: function(channel, game) {
-        this.show(`${channel} is now live playing ${game}!`, 5000);
-    }
-};
+**Multi-Stream Layouts:**
+```
+PiP Mode:                  50/50 Mode:              Quad Mode:
+┌─────────────────┐       ┌────────┬────────┐      ┌────────┬────────┐
+│                 │       │        │        │      │   1    │   2    │
+│     Main        │       │   1    │   2    │      ├────────┼────────┤
+│            ┌────┤       │        │        │      │   3    │   4    │
+│            │PiP │       └────────┴────────┘      └────────┴────────┘
+└────────────┴────┘
 ```
 
-### 4.2 Tauri Auto-Updater
-**Files:** `src-tauri/tauri.conf.json`, `src-tauri/src/lib.rs`
-
-Configure GitHub releases updater:
-```json
-{
-  "plugins": {
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://github.com/user/repo/releases/latest/download/latest.json"
-      ],
-      "dialog": true,
-      "pubkey": "..."
-    }
-  }
-}
-```
-
-### 4.3 Global Hotkeys
-**File:** `src-tauri/src/hotkeys.rs` (new)
-
-Media key support:
-- Play/Pause: Media Play key or Space
-- Volume Up/Down: Media volume keys
-- Mute: M key or Media mute
-
-### 4.4 Settings Persistence
-Keep using `localStorage` (already works in Tauri WebView)
+**Success Criteria:** Can watch 2-4 streams simultaneously with audio switching
 
 ---
 
-## Phase 5: Multi-Stream & PiP (Future)
+### Milestone 8: Native Notifications
+**Goal:** Desktop notifications when followed channels go live
 
-### 5.1 Architecture for Multi-Stream
-Design player module to support multiple instances:
-```javascript
-var DesktopPlayer = {
-    instances: [],  // Array of player instances
+**Deliverables:**
+- [ ] Add `tauri-plugin-notification` to Cargo.toml
+- [ ] DesktopNotifications.js with polling logic
+- [ ] `showLiveNotification(channel, title, game, thumbnail)`
+- [ ] `showTitleChange(channel, newTitle)`
+- [ ] Configurable polling interval (30s, 60s, 2min, 5min)
+- [ ] "Last seen" state to avoid duplicate notifications
+- [ ] Click notification → focus app, navigate to channel
 
-    createInstance: function(containerId) {
-        // Create new HLS.js + video element
-        // Return instance ID
-    },
-
-    destroyInstance: function(instanceId) {
-        // Clean up
-    }
-};
-```
-
-### 5.2 PiP Implementation Options
-1. **In-window PiP**: Multiple `<video>` elements with CSS positioning
-2. **OS-level PiP**: Tauri separate window (more complex)
-
-Recommend: Start with in-window, add OS-level later
+**Success Criteria:** Get desktop notification when followed streamer goes live
 
 ---
 
-## File Change Summary
+### Milestone 9: Refactor Play*.js
+**Goal:** All playback code uses new Desktop modules
 
-### New Files
-| File | Purpose |
-|------|---------|
-| `app/specific/DesktopInterface.js` | Replaces OSInterface.js |
-| `app/specific/PlayDesktop.js` | HLS.js player wrapper |
-| `app/specific/Notifications.js` | In-app notifications |
-| `src-tauri/src/hotkeys.rs` | Global hotkey handling |
-| `src-tauri/src/updater.rs` | Auto-update logic |
+**Deliverables:**
+- [ ] Play.js → `DesktopPlayer.*` calls
+- [ ] PlayVod.js → `DesktopPlayer.*` calls
+- [ ] PlayClip.js → `DesktopPlayer.*` calls
+- [ ] PlayMulti.js → `DesktopMultiPlayer.*` calls
+- [ ] PlayExtra.js → `DesktopMultiPlayer.enablePiP()`
+- [ ] UserLiveFeed.js → `DesktopPreview.*` calls
+- [ ] Remove all `OSInterface_*` references
 
-### Major Modifications
-| File | Changes |
-|------|---------|
-| `Main.js` | Platform detection, remove APK update, remove TV code |
-| `Play.js` | Use DesktopPlayer instead of OSInterface |
-| `PlayVod.js` | Use DesktopPlayer |
-| `PlayClip.js` | Use DesktopPlayer |
-| `PlayHLS.js` | Adapt for HLS.js |
-| `PlayEtc.js` | Remove ExoPlayer references |
-| `PlayMulti.js` | Prepare for multi-instance |
-| `Settings.js` | Remove Android settings |
-| `TVKeyValue.js` | Simplify to desktop keys |
-| `version.js` | Desktop version info |
-
-### Files to Remove (or gut)
-| File | Action |
-|------|--------|
-| `OSInterface.js` | Replace with DesktopInterface.js |
-| `src-tauri/bridge/android-bridge.js` | Delete |
+**Success Criteria:** Zero `OSInterface_*` calls remaining in playback code
 
 ---
 
 ## Implementation Order
 
-### Week 1: Foundation
-1. [ ] Create DesktopInterface.js skeleton
-2. [ ] Add Main_IsDesktop detection
-3. [ ] Simplify TVKeyValue.js
-4. [ ] Get basic app loading without errors
-
-### Week 2: Player
-5. [ ] Integrate HLS.js
-6. [ ] Create PlayDesktop.js
-7. [ ] Adapt Play.js for desktop
-8. [ ] Test single stream playback
-
-### Week 3: Features
-9. [ ] Quality selection UI
-10. [ ] Playback speed control
-11. [ ] Low latency mode
-12. [ ] VOD playback (PlayVod.js)
-
-### Week 4: Polish
-13. [ ] Remove all Android code paths
-14. [ ] In-app notifications
-15. [ ] Auto-updater setup
-16. [ ] Global hotkeys
-
-### Future
-- Multi-stream support
-- PiP mode
-- Gamepad support
+```
+Step 1: Video DOM Infrastructure (Milestone 1)
+    ↓
+Step 2: Hardware Acceleration (Milestone 2)
+    ↓
+Step 3: Desktop Player Module (Milestone 1 continued)
+    ↓
+Step 4: Desktop Controls (Milestone 3)
+    ↓
+Step 5: Chat Overlay System (Milestone 4)
+    ↓
+Step 6: Android Code Removal (Milestone 5)
+    ↓
+Step 7: Preview Player (Milestone 6)
+    ↓
+Step 8: Multi-Player / PiP (Milestone 7)
+    ↓
+Step 9: Notifications (Milestone 8)
+    ↓
+Step 10: Refactor Play*.js (Milestone 9)
+```
 
 ---
 
-## Testing Checklist
+## File Changes Summary
 
-### Core Functionality
-- [ ] App loads without errors
-- [ ] Can browse channels/games
-- [ ] Can search
-- [ ] Can view channel pages
+### New Files to Create
+| File | Purpose |
+|------|---------|
+| `app/specific/DesktopPlayer.js` | Core HLS.js single-player module |
+| `app/specific/DesktopMultiPlayer.js` | Multi-stream/PiP manager (4 instances) |
+| `app/specific/DesktopPreview.js` | Hover preview player with audio |
+| `app/specific/DesktopControls.js` | Keyboard/mouse handler |
+| `app/specific/DesktopNotifications.js` | Native notification system |
+| `app/css/player.css` | Video container layouts, chat overlay |
+| `app/thirdparty/hls.min.js` | Bundled HLS.js v1.5.x |
 
-### Playback
-- [ ] Live stream plays
-- [ ] Quality selection works
-- [ ] Low latency mode works
-- [ ] VOD playback works
-- [ ] Clips play
-- [ ] Seeking works
-- [ ] Playback speed works
+### Files to Rewrite
+| File | Changes |
+|------|---------|
+| `app/specific/DesktopInterface.js` | Remove all shims, keep only Tauri bridge |
 
-### UI/Navigation
-- [ ] Keyboard navigation works
-- [ ] Mouse clicks work
-- [ ] Settings save/load
-- [ ] Login/auth works
+### Files to Refactor
+| File | Changes |
+|------|---------|
+| `app/specific/Play.js` | Use DesktopPlayer module |
+| `app/specific/PlayVod.js` | Use DesktopPlayer module |
+| `app/specific/PlayClip.js` | Use DesktopPlayer module |
+| `app/specific/PlayMulti.js` | Use DesktopMultiPlayer module |
+| `app/specific/PlayExtra.js` | Use DesktopMultiPlayer.enablePiP |
+| `app/specific/Main.js` | Remove TV remote code, simplify platform detection |
+| `app/specific/Settings.js` | Add new settings, remove Android settings |
+| `app/specific/ChatLive.js` | Add overlay transparency/position support |
+| `app/specific/ChatLiveControls.js` | Add position/opacity controls |
+| `app/specific/UserLiveFeed.js` | Use DesktopPreview module |
+| `app/index.html` | Add video elements, link CSS |
 
-### Desktop Features
-- [ ] Window close/minimize
-- [ ] Fullscreen toggle
-- [ ] Volume control
-- [ ] Notifications appear
-- [ ] Auto-update check
+### Files to Delete
+| File | Reason |
+|------|--------|
+| `app/specific/BrowserTest.js` | No longer needed |
+
+### Rust Backend Updates
+| File | Changes |
+|------|---------|
+| `src-tauri/Cargo.toml` | Add tauri-plugin-notification |
+| `src-tauri/src/lib.rs` | HW accel flag handling, GPU detection command |
+| `src-tauri/tauri.conf.json` | Window config, browser args |
+
+---
+
+## Settings
+
+### New Settings
+| Setting | Default | Options | Restart Required |
+|---------|---------|---------|------------------|
+| Hardware Acceleration | ON | ON/OFF | Yes |
+| Chat Overlay Position | Right | Right, Left, Top-Right, Top-Left, Bottom-Right, Bottom-Left | No |
+| Chat Overlay Opacity | 80% | 0-100% slider | No |
+| Chat Overlay Width | Medium | Narrow, Medium, Wide | No |
+| Preview Audio | ON | ON/OFF | No |
+| Low Latency Mode | OFF | ON/OFF | No |
+| Latency Catch-Up | ON | ON/OFF | No |
+| Notification Polling | 60s | 30s, 60s, 2min, 5min | No |
+
+### Settings to Remove (Android-specific)
+- ExoPlayer buffer sizes
+- Codec blacklists
+- Resolution blocking
+- TV remote key mapping
+- Notification service config
+- APK update settings
 
 ---
 
 ## Dependencies
 
 ### JavaScript
-- **HLS.js** - HLS streaming (MIT license)
+| Library | Version | Purpose |
+|---------|---------|---------|
+| HLS.js | 1.5.x | HLS streaming with custom loaders |
 
 ### Rust/Tauri
-- **tauri** - Desktop shell
-- **tauri-plugin-updater** - Auto-updates
-- **tauri-plugin-global-shortcut** - Hotkeys
-- **reqwest** - CORS proxy HTTP
+| Crate | Purpose |
+|-------|---------|
+| tauri | Desktop shell |
+| tauri-plugin-notification | Native notifications |
+| reqwest | HTTP proxy for CORS bypass |
+| base64 | Binary data encoding for video segments |
+
+---
+
+## Testing Checklist
+
+### Milestone 1-2: Video Foundation
+- [ ] Video element visible in DOM
+- [ ] HLS.js loads without errors
+- [ ] Can play Twitch live stream
+- [ ] Video renders (not black screen)
+- [ ] Hardware decode active (check GPU usage)
+
+### Milestone 3: Controls
+- [ ] Space pauses/plays
+- [ ] Arrow keys seek
+- [ ] Volume up/down works
+- [ ] Mute toggles
+- [ ] Fullscreen works (native OS)
+- [ ] Mouse click pauses
+- [ ] Mouse double-click fullscreens
+- [ ] Mouse scroll changes volume
+
+### Milestone 4: Chat Overlay
+- [ ] Chat visible over video
+- [ ] Transparency adjustable
+- [ ] Position changes correctly
+- [ ] Width options work
+- [ ] Keyboard shortcuts (C, Shift+C) work
+
+### Milestone 5: Code Cleanup
+- [ ] No errors in console
+- [ ] All features still work
+- [ ] No `OSInterface_` references in app/
+
+### Milestone 6: Preview
+- [ ] Preview appears on hover
+- [ ] Audio plays (not muted)
+- [ ] Main player audio pauses
+- [ ] Preview destroys on mouse leave
+- [ ] Low quality enforced
+
+### Milestone 7: Multi-Stream
+- [ ] PiP mode works
+- [ ] 50/50 split works
+- [ ] Quad view works
+- [ ] Audio focus switching works
+- [ ] Chat follows focus
+
+### Milestone 8: Notifications
+- [ ] Notification appears when channel goes live
+- [ ] Click notification focuses app
+- [ ] No duplicate notifications
+- [ ] Polling interval configurable
+
+### Milestone 9: Final Integration
+- [ ] Live stream playback
+- [ ] VOD playback with seek
+- [ ] Clip playback
+- [ ] Quality selection
+- [ ] All keyboard shortcuts
+- [ ] Settings save/load
+- [ ] Login/auth works
 
 ---
 
 ## Notes
 
-### Why HLS.js?
-1. Full quality selection API
-2. Low-latency HLS support
-3. Hardware acceleration via browser
-4. Well-maintained, Twitch-compatible
-5. Supports multiple instances (multi-stream ready)
+### Why Complete Rewrite Over Shims?
+1. **Clean codebase** - No Android cruft or compatibility layers
+2. **Better performance** - Direct calls instead of shim overhead
+3. **Maintainability** - Easier to debug and extend
+4. **Desktop-native UX** - Proper keyboard/mouse patterns
+
+### Hardware Acceleration Strategy
+- WebView2 (Windows) has GPU acceleration **enabled by default**
+- RTX Video SR works **automatically** at driver level
+- User toggle requires app restart (Chromium limitation)
+- No code needed for RTX Video - just ensure video plays correctly
 
 ### CORS Strategy
-Twitch API requires CORS bypass. Options:
-1. **Tauri HTTP commands** - Rust makes requests, returns to JS
-2. **Local proxy** - Tauri runs local proxy server
+All Twitch API and HLS requests go through Tauri's Rust backend:
+1. HLS.js custom `pLoader` for playlist requests
+2. HLS.js custom `fLoader` for video segment binary data
+3. Tauri `invoke()` calls `http_request` / `http_request_binary` commands
+4. Rust uses `reqwest` to make actual HTTP requests
+5. No CORS issues because requests originate from native code
 
-Recommendation: Tauri HTTP commands (simpler, already partially implemented)
-
-### Complete Fork Benefits
-- Clean codebase, no Android cruft
-- Faster development going forward
-- Desktop-optimized UX
-- No shim overhead
+### Multi-Instance HLS.js
+- Each video element gets its own HLS.js instance
+- Maximum 4 simultaneous instances (main + PiP or quad)
+- Preview uses 5th lightweight instance
+- Custom loaders shared across all instances
+- Memory managed by destroying unused instances

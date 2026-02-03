@@ -536,12 +536,53 @@ var Desktop_playerState = {
 // Get or create video element
 function Desktop_getVideoElement() {
     if (!Desktop_VideoElement) {
-        Desktop_VideoElement = document.getElementById('clip_player');
+        Desktop_VideoElement = document.getElementById('player_video');
         if (!Desktop_VideoElement) {
+            // Fallback to any video element
             Desktop_VideoElement = document.querySelector('video');
         }
     }
     return Desktop_VideoElement;
+}
+
+// Get video container element
+function Desktop_getVideoContainer() {
+    return document.getElementById('player_video_container');
+}
+
+// Show the video player container
+function Desktop_showPlayer() {
+    var container = Desktop_getVideoContainer();
+    if (container) {
+        container.classList.add('active');
+        console.log('[DesktopInterface] Player container shown');
+    }
+    Desktop_hideLoading();
+}
+
+// Hide the video player container
+function Desktop_hidePlayer() {
+    var container = Desktop_getVideoContainer();
+    if (container) {
+        container.classList.remove('active');
+        console.log('[DesktopInterface] Player container hidden');
+    }
+}
+
+// Hide loading indicator
+function Desktop_hideLoading() {
+    var loading = document.getElementById('player_loading');
+    if (loading) {
+        loading.classList.remove('visible');
+    }
+}
+
+// Show loading indicator
+function Desktop_showLoading() {
+    var loading = document.getElementById('player_loading');
+    if (loading) {
+        loading.classList.add('visible');
+    }
 }
 
 // Check if HLS.js is supported
@@ -768,6 +809,7 @@ function OSInterface_stopVideo() {
         video.load();
     }
     Desktop_DestroyHLS();
+    Desktop_hidePlayer();
     Desktop_playerState.playing = false;
     Desktop_playerState.currentTime = 0;
 }
@@ -907,6 +949,9 @@ function OSInterface_StartAuto(uri, mainPlaylistString, who_called, ResumePositi
         ResumePosition: ResumePosition,
         player: player
     });
+
+    // Show the player container
+    Desktop_showPlayer();
 
     // Store state
     Desktop_WhoCalledPlayer = who_called || 0;

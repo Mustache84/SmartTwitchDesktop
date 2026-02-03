@@ -39,7 +39,9 @@
         <link rel="dns-prefetch" href="https://api.betterttv.net" />
         <link rel="preconnect" href="https://badges.twitch.tv" />
         <link rel="stylesheet" href="../release/githubio/css/icons.css" />
-        <title>SmartTV Twitch</title>
+        <!-- Desktop Video Player Styles -->
+        <link rel="stylesheet" href="css/player.css" />
+        <title>SmartTwitch Desktop</title>
         <link rel="shortcut icon" type="image/png" href="../release/githubio/images/favicon.png" />
         <style id="focus_class_holder"></style>
         <style id="focus_class_test"></style>
@@ -4339,6 +4341,61 @@
                     <video id="clip_player" autoplay></video>
                 </div>
             </div>
+
+            <!-- ==================== DESKTOP VIDEO PLAYERS ==================== -->
+            
+            <!-- Primary Video Player Container -->
+            <div id="player_video_container" class="player_video_container">
+                <video id="player_video" class="player_video" playsinline crossorigin="anonymous"></video>
+                <div id="player_loading_overlay" class="player_loading_overlay">
+                    <div class="player_loading_spinner"></div>
+                </div>
+            </div>
+
+            <!-- Picture-in-Picture Container -->
+            <div id="pip_video_container" class="pip_video_container">
+                <video id="pip_video" class="pip_video" playsinline crossorigin="anonymous" muted></video>
+                <div class="pip_close_button" id="pip_close_button">
+                    <i class="icon-cancel"></i>
+                </div>
+                <div class="pip_swap_button" id="pip_swap_button">
+                    <i class="icon-resize-full-alt"></i>
+                </div>
+            </div>
+
+            <!-- Multi-Stream Grid Container -->
+            <div id="multi_video_grid" class="multi_video_grid">
+                <div id="multi_video_cell_0" class="multi_video_cell">
+                    <video id="multi_video_0" playsinline crossorigin="anonymous" muted></video>
+                    <div class="multi_video_label" id="multi_label_0"></div>
+                </div>
+                <div id="multi_video_cell_1" class="multi_video_cell">
+                    <video id="multi_video_1" playsinline crossorigin="anonymous" muted></video>
+                    <div class="multi_video_label" id="multi_label_1"></div>
+                </div>
+                <div id="multi_video_cell_2" class="multi_video_cell">
+                    <video id="multi_video_2" playsinline crossorigin="anonymous" muted></video>
+                    <div class="multi_video_label" id="multi_label_2"></div>
+                </div>
+                <div id="multi_video_cell_3" class="multi_video_cell">
+                    <video id="multi_video_3" playsinline crossorigin="anonymous" muted></video>
+                    <div class="multi_video_label" id="multi_label_3"></div>
+                </div>
+            </div>
+
+            <!-- Preview Video Container (for hover previews) -->
+            <div id="preview_video_container" class="preview_video_container medium">
+                <video id="preview_video" class="preview_video" playsinline crossorigin="anonymous"></video>
+                <div class="preview_loading" id="preview_loading"></div>
+            </div>
+
+            <!-- Chat Overlay Container -->
+            <div id="chat_overlay_container" class="chat_overlay_container position_right width_medium">
+                <div id="chat_overlay_content" class="chat_overlay_content"></div>
+            </div>
+
+            <!-- ==================== END DESKTOP VIDEO PLAYERS ==================== -->
+
             <!-- Empty div over the app that prevents text imputs from malfunctioning-->
             <div id="scene_keys" class="scene_keys"></div>
             <div id="minimize_warning" class="strokedelinebig dialog_text dialogs hide" style="top: 40vh; font-size: 6vh; height: auto"></div>
@@ -4382,8 +4439,10 @@
         <script src="general/img64.js" defer></script>
         <script src="general/emojis.js" defer></script>
         <script src="general/version.js" defer></script>
-        <!-- HLS.js for desktop video playback -->
-        <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" defer></script>
+        <!-- HLS.js for desktop video playback (bundled locally) -->
+        <script src="thirdparty/hls.min.js" defer></script>
+        <!-- Desktop-specific modules (load DesktopPlayer before DesktopInterface) -->
+        <script src="specific/DesktopPlayer.js" defer></script>
         <script src="specific/DesktopInterface.js" defer></script>
         <script src="specific/Play.js" defer></script>
         <script src="specific/PlayHLS.js" defer></script>

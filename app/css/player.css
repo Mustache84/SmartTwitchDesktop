@@ -1,0 +1,614 @@
+/**
+ * SmartTwitch Desktop - Video Player CSS
+ * 
+ * Z-Index Layering:
+ * - 100: Primary video player container
+ * - 110: Chat overlay (above video, below controls)
+ * - 120: Player controls overlay
+ * - 150: PiP video container
+ * - 200: Preview video container
+ * - 300: Dialogs/modals
+ */
+
+/* =============================================================================
+   PRIMARY VIDEO PLAYER
+   ============================================================================= */
+
+.player_video_container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    background: #000;
+    display: none;
+}
+
+.player_video_container.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.player_video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+
+/* Theater mode - letterbox style */
+.player_video_container.theater {
+    background: #000;
+}
+
+.player_video_container.theater .player_video {
+    max-height: 80%;
+}
+
+/* =============================================================================
+   PICTURE-IN-PICTURE (PiP) CONTAINER
+   ============================================================================= */
+
+.pip_video_container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 400px;
+    height: 225px;
+    z-index: 150;
+    background: #000;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    display: none;
+    cursor: move;
+    transition: transform 0.15s ease-out;
+}
+
+.pip_video_container.active {
+    display: block;
+}
+
+.pip_video_container:hover {
+    transform: scale(1.02);
+}
+
+.pip_video_container.focused {
+    box-shadow: 0 0 0 3px #9147ff, 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.pip_video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* PiP close button */
+.pip_close_button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+
+.pip_video_container:hover .pip_close_button {
+    opacity: 1;
+}
+
+.pip_close_button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* PiP swap button */
+.pip_swap_button {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+
+.pip_video_container:hover .pip_swap_button {
+    opacity: 1;
+}
+
+.pip_swap_button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* =============================================================================
+   MULTI-STREAM GRID LAYOUTS
+   ============================================================================= */
+
+.multi_video_grid {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    background: #000;
+    display: none;
+}
+
+.multi_video_grid.active {
+    display: grid;
+}
+
+/* 50/50 Split Mode - 2 streams side by side */
+.multi_video_grid.split_2 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    gap: 2px;
+}
+
+/* Quad Mode - 2x2 grid */
+.multi_video_grid.quad {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+}
+
+.multi_video_cell {
+    position: relative;
+    background: #111;
+    overflow: hidden;
+}
+
+.multi_video_cell video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Audio focus indicator */
+.multi_video_cell.audio_focus {
+    box-shadow: inset 0 0 0 3px #9147ff;
+}
+
+.multi_video_cell.audio_focus::after {
+    content: '🔊';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 24px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Channel name overlay on multi-stream */
+.multi_video_label {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 14px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.multi_video_cell:hover .multi_video_label {
+    opacity: 1;
+}
+
+/* =============================================================================
+   PREVIEW VIDEO (HOVER PREVIEW)
+   ============================================================================= */
+
+.preview_video_container {
+    position: fixed;
+    z-index: 200;
+    background: #000;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    display: none;
+    pointer-events: none;
+}
+
+.preview_video_container.active {
+    display: block;
+}
+
+.preview_video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Preview size presets */
+.preview_video_container.small {
+    width: 320px;
+    height: 180px;
+}
+
+.preview_video_container.medium {
+    width: 480px;
+    height: 270px;
+}
+
+.preview_video_container.large {
+    width: 640px;
+    height: 360px;
+}
+
+/* Loading indicator for preview */
+.preview_loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #9147ff;
+    border-radius: 50%;
+    animation: preview_spin 0.8s linear infinite;
+}
+
+@keyframes preview_spin {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+/* =============================================================================
+   CHAT OVERLAY
+   ============================================================================= */
+
+.chat_overlay_container {
+    position: fixed;
+    z-index: 110;
+    display: none;
+    pointer-events: auto;
+    transition: all 0.3s ease;
+}
+
+.chat_overlay_container.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chat position presets */
+.chat_overlay_container.position_right {
+    top: 0;
+    right: 0;
+    height: 100%;
+}
+
+.chat_overlay_container.position_left {
+    top: 0;
+    left: 0;
+    height: 100%;
+}
+
+.chat_overlay_container.position_top_right {
+    top: 0;
+    right: 0;
+    height: 50%;
+}
+
+.chat_overlay_container.position_top_left {
+    top: 0;
+    left: 0;
+    height: 50%;
+}
+
+.chat_overlay_container.position_bottom_right {
+    bottom: 0;
+    right: 0;
+    height: 50%;
+}
+
+.chat_overlay_container.position_bottom_left {
+    bottom: 0;
+    left: 0;
+    height: 50%;
+}
+
+/* Chat width presets */
+.chat_overlay_container.width_narrow {
+    width: 280px;
+}
+
+.chat_overlay_container.width_medium {
+    width: 340px;
+}
+
+.chat_overlay_container.width_wide {
+    width: 420px;
+}
+
+/* Chat transparency - applied via inline style for variable opacity */
+.chat_overlay_content {
+    flex: 1;
+    overflow: hidden;
+    /* Background opacity controlled by JS via rgba */
+}
+
+/* =============================================================================
+   PLAYER CONTROLS OVERLAY
+   ============================================================================= */
+
+.player_controls_overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 120;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 20px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.player_controls_overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.player_controls_bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Progress bar */
+.player_progress_container {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+}
+
+.player_progress_container:hover {
+    height: 6px;
+}
+
+.player_progress_bar {
+    height: 100%;
+    background: #9147ff;
+    border-radius: 2px;
+    position: relative;
+}
+
+.player_progress_handle {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.player_progress_container:hover .player_progress_handle {
+    opacity: 1;
+}
+
+/* Buffer indicator */
+.player_buffer_bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 2px;
+}
+
+/* Control buttons */
+.player_control_button {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #fff;
+    font-size: 20px;
+    transition: background 0.2s;
+}
+
+.player_control_button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Volume slider */
+.player_volume_container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.player_volume_slider {
+    width: 80px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+}
+
+.player_volume_level {
+    height: 100%;
+    background: #fff;
+    border-radius: 2px;
+}
+
+/* Time display */
+.player_time_display {
+    color: #fff;
+    font-size: 14px;
+    font-family: monospace;
+    min-width: 100px;
+}
+
+/* Quality badge */
+.player_quality_badge {
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.player_quality_badge:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* =============================================================================
+   LOADING & BUFFERING STATES
+   ============================================================================= */
+
+.player_loading_overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 105;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.player_loading_overlay.visible {
+    opacity: 1;
+}
+
+.player_loading_spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #9147ff;
+    border-radius: 50%;
+    animation: player_spin 0.8s linear infinite;
+}
+
+@keyframes player_spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* =============================================================================
+   ERROR STATES
+   ============================================================================= */
+
+.player_error_overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 105;
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+}
+
+.player_error_icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: #e91916;
+}
+
+.player_error_message {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.player_error_detail {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 20px;
+}
+
+.player_retry_button {
+    padding: 10px 24px;
+    background: #9147ff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.player_retry_button:hover {
+    background: #772ce8;
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+   ============================================================================= */
+
+.player_hidden {
+    display: none !important;
+}
+
+.player_fade_in {
+    animation: player_fade_in 0.3s ease;
+}
+
+@keyframes player_fade_in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.player_fade_out {
+    animation: player_fade_out 0.3s ease;
+}
+
+@keyframes player_fade_out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
