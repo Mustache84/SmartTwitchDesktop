@@ -53,6 +53,7 @@ pub fn run() {
             commands::http::m_method_url_headers,
             commands::http::base_xml_http_get,
             commands::http::xml_http_get_full,
+            commands::http::fetch_binary,
             // Window commands
             commands::window::mclose,
             commands::window::show_toast,

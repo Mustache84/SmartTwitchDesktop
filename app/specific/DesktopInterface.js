@@ -173,7 +173,7 @@ function OSInterface_mMethodUrlHeaders(urlString, timeout, postMessage, Method, 
     }
 }
 
-// Async HTTP request with callbacks - Tauri converts camelCase JS to snake_case Rust
+// Async HTTP request with callbacks - Rust returns response, JS handles callbacks
 function OSInterface_BaseXmlHttpGet(urlString, timeout, postMessage, Method, JsonHeadersArray, callback, checkResult, key, callBackSuccess, calBackError) {
     console.log('[DesktopInterface] BaseXmlHttpGet called:', {
         url: urlString ? urlString.substring(0, 80) : 'null',
@@ -186,19 +186,38 @@ function OSInterface_BaseXmlHttpGet(urlString, timeout, postMessage, Method, Jso
         timeout: timeout || 10000,
         postMessage: postMessage || null,
         method: Method || 'GET',
-        jsonHeadersArray: JsonHeadersArray || null,
-        callback: callback,
-        checkResult: checkResult || 0,
-        key: key || null,
-        callBackSuccess: callBackSuccess,
-        callBackError: calBackError
-    }).then(function(result) {
-        console.log('[DesktopInterface] BaseXmlHttpGet success, result:', result);
+        jsonHeadersArray: JsonHeadersArray || null
+    }).then(function(response) {
+        console.log('[DesktopInterface] BaseXmlHttpGet response:', {
+            status: response ? response.status : 'null',
+            hasResponseText: response ? !!response.response_text : false,
+            responseTextLength: response && response.response_text ? response.response_text.length : 0
+        });
+        // Invoke the callback function with the response
+        // Format response as JSON string with status, responseText, url, and checkResult
+        // url is needed by Play_loadDataResultEnd to set Play_data.AutoUrl
+        // checkResult is needed by Play_loadDataResult for request validation
+        if (callback && typeof window[callback] === 'function') {
+            try {
+                var wrappedResponse = JSON.stringify({
+                    status: response ? response.status : 0,
+                    responseText: response ? response.response_text : '',
+                    url: urlString,
+                    checkResult: checkResult || 0
+                });
+                console.log('[DesktopInterface] Invoking callback:', callback);
+                window[callback](wrappedResponse, key || 0, callBackSuccess, calBackError, checkResult || 0);
+            } catch (cbError) {
+                console.error('[DesktopInterface] Callback error:', cbError);
+            }
+        } else {
+            console.error('[DesktopInterface] Callback not found:', callback);
+        }
     }).catch(function(e) {
         console.error('[DesktopInterface] BaseXmlHttpGet error:', e);
-        if (calBackError && typeof window[calBackError] === 'function') {
+        if (callback && typeof window[callback] === 'function') {
             try {
-                window[calBackError](key, checkResult, null);
+                window[callback](null, key || 0, callBackSuccess, calBackError, checkResult || 0);
             } catch (cbError) {
                 console.error('[DesktopInterface] Error callback failed:', cbError);
             }
@@ -206,11 +225,12 @@ function OSInterface_BaseXmlHttpGet(urlString, timeout, postMessage, Method, Jso
     });
 }
 
-// Full async HTTP request with validation - Tauri converts camelCase JS to snake_case Rust
+// Full async HTTP request with validation - Rust returns response, JS handles callbacks
 function OSInterface_XmlHttpGetFull(urlString, timeout, postMessage, Method, JsonHeadersArray, callback, checkResult, check_1, check_2, check_3, check_4, check_5, callBackSuccess, callBackError) {
     console.log('[DesktopInterface] XmlHttpGetFull called:', {
         url: urlString ? urlString.substring(0, 80) : 'null',
         callback: callback,
+        checkResult: checkResult,
         callBackSuccess: callBackSuccess
     });
 
@@ -219,18 +239,33 @@ function OSInterface_XmlHttpGetFull(urlString, timeout, postMessage, Method, Jso
         timeout: timeout || 10000,
         postMessage: postMessage || null,
         method: Method || 'GET',
-        jsonHeadersArray: JsonHeadersArray || null,
-        callback: callback,
-        checkResult: checkResult || 0,
-        check1: check_1 || null,
-        check2: check_2 || null,
-        check3: check_3 || null,
-        check4: check_4 || null,
-        check5: check_5 || null,
-        callBackSuccess: callBackSuccess,
-        callBackError: callBackError || null
-    }).then(function(result) {
-        console.log('[DesktopInterface] XmlHttpGetFull success, result:', result);
+        jsonHeadersArray: JsonHeadersArray || null
+    }).then(function(response) {
+        console.log('[DesktopInterface] XmlHttpGetFull response:', {
+            status: response ? response.status : 'null',
+            hasResponseText: response ? !!response.response_text : false,
+            responseTextLength: response && response.response_text ? response.response_text.length : 0
+        });
+        // Invoke the callback function with the response
+        // Format response as JSON string with status, responseText, url, and checkResult
+        // url is needed by Play_loadDataResultEnd to set Play_data.AutoUrl
+        // checkResult is needed by Play_loadDataResult for request validation
+        if (callback && typeof window[callback] === 'function') {
+            try {
+                var wrappedResponse = JSON.stringify({
+                    status: response ? response.status : 0,
+                    responseText: response ? response.response_text : '',
+                    url: urlString,
+                    checkResult: checkResult || 0
+                });
+                console.log('[DesktopInterface] Invoking callback:', callback, 'with checkResult:', checkResult);
+                window[callback](wrappedResponse, checkResult || 0, check_1 || null, check_2 || null, check_3 || null, check_4 || null, check_5 || null, callBackSuccess, callBackError);
+            } catch (cbError) {
+                console.error('[DesktopInterface] Callback error:', cbError);
+            }
+        } else {
+            console.error('[DesktopInterface] Callback not found:', callback);
+        }
     }).catch(function(e) {
         console.error('[DesktopInterface] XmlHttpGetFull error:', e);
         if (callBackError && typeof window[callBackError] === 'function') {
@@ -274,6 +309,208 @@ function OSInterface_mclose(close) {
 function OSInterface_mloadUrl(url) {
     window.location.href = url;
 }
+
+//=============================================================================
+// HLS.JS CUSTOM LOADER
+// Routes HLS.js HTTP requests through Tauri backend to bypass CORS
+//=============================================================================
+
+// Custom loader class for HLS.js that uses Tauri for HTTP requests
+// This bypasses CORS restrictions by routing through the Rust backend
+var Desktop_HLSLoader = function(config) {
+    var self = this;
+    self.stats = {
+        aborted: false,
+        loaded: 0,
+        retry: 0,
+        total: 0,
+        chunkCount: 0,
+        bwEstimate: 0,
+        loading: { start: 0, first: 0, end: 0 },
+        parsing: { start: 0, end: 0 },
+        buffering: { start: 0, first: 0, end: 0 }
+    };
+    self.context = null;
+    self.callbacks = null;
+    self.retryDelay = 0;
+};
+
+Desktop_HLSLoader.prototype.load = function(context, config, callbacks) {
+    var self = this;
+    self.context = context;
+    self.callbacks = callbacks;
+    self.stats.loading.start = performance.now();
+    self.retryDelay = config.retryDelay || 0;
+
+    var url = context.url;
+
+    console.log('[HLSLoader] Loading playlist:', url.substring(0, 100) + '...');
+
+    // Handle blob URLs directly using native fetch (no CORS issues for local blobs)
+    if (url.indexOf('blob:') === 0) {
+        console.log('[HLSLoader] Blob URL detected, using native fetch');
+        fetch(url)
+            .then(function(response) {
+                return response.text();
+            })
+            .then(function(text) {
+                if (self.stats.aborted) {
+                    console.log('[HLSLoader] Request aborted');
+                    return;
+                }
+                self.stats.loading.first = performance.now();
+                self.stats.loading.end = performance.now();
+                self.stats.loaded = text.length;
+                self.stats.total = text.length;
+                console.log('[HLSLoader] Blob loaded, size:', text.length);
+                callbacks.onSuccess({
+                    url: url,
+                    data: text
+                }, self.stats, context, null);
+            })
+            .catch(function(e) {
+                if (self.stats.aborted) {
+                    return;
+                }
+                console.error('[HLSLoader] Blob load error:', e);
+                callbacks.onError({ code: 0, text: e.toString() }, context, null, self.stats);
+            });
+        return;
+    }
+
+    // For regular URLs, use Tauri backend to bypass CORS
+    Desktop_invoke('base_xml_http_get', {
+        urlString: url,
+        timeout: config.timeout || 20000,
+        postMessage: null,
+        method: 'GET',
+        jsonHeadersArray: null
+    }).then(function(response) {
+        if (self.stats.aborted) {
+            console.log('[HLSLoader] Request aborted');
+            return;
+        }
+
+        self.stats.loading.first = performance.now();
+        self.stats.loading.end = performance.now();
+
+        console.log('[HLSLoader] Response status:', response ? response.status : 'null');
+
+        if (response && response.status === 200 && response.response_text) {
+            self.stats.loaded = response.response_text.length;
+            self.stats.total = response.response_text.length;
+
+            console.log('[HLSLoader] Success, loaded', response.response_text.length, 'bytes');
+
+            callbacks.onSuccess({
+                url: url,
+                data: response.response_text
+            }, self.stats, context, null);
+        } else {
+            console.error('[HLSLoader] HTTP Error:', response ? response.status : 'no response');
+            var error = {
+                code: response ? response.status : 0,
+                text: 'HTTP Error ' + (response ? response.status : 'unknown')
+            };
+            callbacks.onError(error, context, null, self.stats);
+        }
+    }).catch(function(e) {
+        if (self.stats.aborted) {
+            return;
+        }
+        console.error('[HLSLoader] Load error:', e);
+        callbacks.onError({ code: 0, text: e.toString() }, context, null, self.stats);
+    });
+};
+
+Desktop_HLSLoader.prototype.abort = function() {
+    console.log('[HLSLoader] Aborting');
+    this.stats.aborted = true;
+};
+
+Desktop_HLSLoader.prototype.destroy = function() {
+    this.abort();
+};
+
+//=============================================================================
+// HLS.JS FRAGMENT LOADER (for video segments)
+// Routes video segment requests through Tauri backend to bypass CORS
+//=============================================================================
+
+// Custom fragment loader class for HLS.js that uses Tauri for binary data
+var Desktop_HLSFragmentLoader = function(config) {
+    var self = this;
+    self.stats = {
+        aborted: false,
+        loaded: 0,
+        retry: 0,
+        total: 0,
+        chunkCount: 0,
+        bwEstimate: 0,
+        loading: { start: 0, first: 0, end: 0 },
+        parsing: { start: 0, end: 0 },
+        buffering: { start: 0, first: 0, end: 0 }
+    };
+    self.context = null;
+    self.callbacks = null;
+    self.retryDelay = 0;
+};
+
+Desktop_HLSFragmentLoader.prototype.load = function(context, config, callbacks) {
+    var self = this;
+    self.context = context;
+    self.callbacks = callbacks;
+    self.stats.loading.start = performance.now();
+    self.retryDelay = config.retryDelay || 0;
+
+    var url = context.url;
+
+    // Use Tauri backend to fetch binary data
+    Desktop_invoke('fetch_binary', {
+        url: url,
+        timeout: config.timeout || 30000
+    }).then(function(response) {
+        if (self.stats.aborted) {
+            return;
+        }
+
+        self.stats.loading.first = performance.now();
+        self.stats.loading.end = performance.now();
+
+        if (response && response.status === 200 && response.data) {
+            // Convert array to Uint8Array
+            var uint8Array = new Uint8Array(response.data);
+            self.stats.loaded = uint8Array.length;
+            self.stats.total = uint8Array.length;
+
+            callbacks.onSuccess({
+                url: url,
+                data: uint8Array.buffer
+            }, self.stats, context, null);
+        } else {
+            console.error('[HLSFragmentLoader] HTTP Error:', response ? response.status : 'no response');
+            var error = {
+                code: response ? response.status : 0,
+                text: 'HTTP Error ' + (response ? response.status : 'unknown')
+            };
+            callbacks.onError(error, context, null, self.stats);
+        }
+    }).catch(function(e) {
+        if (self.stats.aborted) {
+            return;
+        }
+        console.error('[HLSFragmentLoader] Load error:', e);
+        callbacks.onError({ code: 0, text: e.toString() }, context, null, self.stats);
+    });
+};
+
+Desktop_HLSFragmentLoader.prototype.abort = function() {
+    this.stats.aborted = true;
+};
+
+Desktop_HLSFragmentLoader.prototype.destroy = function() {
+    this.abort();
+};
 
 //=============================================================================
 // HLS.JS PLAYER IMPLEMENTATION
@@ -334,6 +571,9 @@ function Desktop_InitHLS() {
         maxBufferHole: 0.5,
         startLevel: -1, // Auto
         capLevelToPlayerSize: false,
+        // Use custom loaders to bypass CORS via Tauri
+        pLoader: Desktop_HLSLoader,      // Playlist loader (text m3u8 files)
+        fLoader: Desktop_HLSFragmentLoader, // Fragment loader (binary video segments)
         // Twitch-specific optimizations
         manifestLoadingTimeOut: 10000,
         manifestLoadingMaxRetry: 3,
@@ -713,7 +953,21 @@ function OSInterface_StartAuto(uri, mainPlaylistString, who_called, ResumePositi
     // Load the stream
     Desktop_HLS.on(Hls.Events.MEDIA_ATTACHED, function() {
         console.log('[DesktopInterface] HLS attached to video element');
-        Desktop_HLS.loadSource(uri);
+
+        // If we have the manifest content, use a blob URL to avoid CORS for master manifest
+        if (mainPlaylistString && mainPlaylistString.length > 0) {
+            console.log('[DesktopInterface] Using pre-fetched manifest, length:', mainPlaylistString.length);
+            var blob = new Blob([mainPlaylistString], { type: 'application/vnd.apple.mpegurl' });
+            var blobUrl = URL.createObjectURL(blob);
+            Desktop_HLS.loadSource(blobUrl);
+            // Clean up blob URL after a delay
+            setTimeout(function() {
+                URL.revokeObjectURL(blobUrl);
+            }, 30000);
+        } else {
+            // Fallback to direct URL (will use custom loader)
+            Desktop_HLS.loadSource(uri);
+        }
     });
 }
 
