@@ -1,8 +1,117 @@
 # SmartTwitchTV → Flutter Migration Plan
 
-> **Status:** Draft v1.0  
+> **Status:** In Progress v1.2  
 > **Date:** February 3, 2026  
+> **Last Updated:** February 3, 2026  
 > **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)
+
+---
+
+## Progress Log
+
+### ✅ Phase 1: Foundation (COMPLETE)
+- [x] Created Flutter project with desktop targets (macOS/Windows/Linux)
+- [x] Integrated `fvp` v0.26.0 → **upgraded to v0.35.2** for MDK hardware-accelerated playback
+- [x] Implemented `TwitchApiService` with GraphQL token fetching
+- [x] Built `HlsUrlBuilder` with correct Twitch URL parameters
+- [x] Single-stream playback working with live channels
+- [x] Added macOS network entitlements for HTTP requests
+- [x] Offline channel detection with user-friendly messaging
+
+### ✅ Phase 3: Multi-Stream (PARTIAL - Core Complete)
+- [x] Implemented `MultiStreamState` with Riverpod for 4-slot management
+- [x] Built `MultiStreamGrid` with 2x2 layout
+- [x] Audio focus switching via click (only one stream audible at a time)
+- [x] Stream rotation functionality
+- [x] Drag-and-drop slot reordering
+- [x] `VideoControllerManager` singleton for persistent playback during drag-drop
+
+### ✅ Home Screen & Browse (COMPLETE)
+- [x] Twitch-like home screen with 10 featured streams (`home_screen.dart`)
+- [x] Categories/games browsing with top categories section
+- [x] **Stream preview on hover with audio** - snappy instant playback via pre-initialization
+- [x] Collapsible sidebar with login placeholder (`collapsible_sidebar.dart`)
+- [x] Search bar (placeholder UI - functionality pending)
+- [x] `TwitchBrowseService` for fetching featured streams & top categories
+- [x] `StreamPreviewCard` with thumbnail, title, channel, viewer count
+- [x] `CategoryCard` with box art and viewer count
+
+### ✅ Preview System Optimizations (COMPLETE)
+- [x] `PreviewPlayerManager` - pre-initializes ALL 10 video controllers on home screen load
+- [x] Parallel token fetching with `Future.wait` for fast preload
+- [x] Hover delay reduced to 50ms (tunable in `ui_config.dart`)
+- [x] Instant playback on hover - just calls `play()` on pre-initialized controller
+- [x] RAM optimization: preview controllers disposed when navigating to PlayerScreen
+- [x] Automatic re-preload when returning to home screen
+- [x] `streamPreviewQuality` tunable setting (default: 'auto')
+- [x] `streamPreviewAudioEnabled` tunable setting (default: true)
+
+### ✅ Package & Architecture Updates (COMPLETE)
+- [x] Upgraded all packages to latest versions (`flutter pub upgrade --major-versions`)
+  - `fvp` 0.26.0 → 0.35.2
+  - `flutter_riverpod` 2.x → 3.1.0
+  - `window_manager` 0.4.0 → 0.5.1
+  - `dio` 5.4.0 → 5.7.0
+- [x] Migrated Riverpod state from v2 `StateNotifier` to v3 `Notifier` pattern
+- [x] Fixed CocoaPods dependencies for macOS build
+
+### 🔄 Next: Phase 2 - Chat System
+- [ ] Wire up search functionality
+- [ ] Implement `TwitchIrcClient` with WebSocket
+- [ ] Port IRC message parser from `irc-message.js`
+- [ ] Implement `EmoteService` (BTTV/FFZ/7TV)
+- [ ] Basic chat overlay rendering
+
+---
+
+## Design Decisions & Technical Notes
+
+### API Configuration
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Primary Client ID | `kd1unb4b3q4t58fwlpcbzcbnm76a8fp` | Decoded from Chat_token, most reliable |
+| Fallback Client IDs | `ue666qo983tsx6so1t0vnawi233wa`, `kimne78kx3ncx6brgo4mv6wki5h1ko` | Used if primary rate-limited |
+| GraphQL Endpoint | `https://gql.twitch.tv/gql` | All token/browse queries |
+| HLS Manifest | `https://usher.ttvnw.net/api/channel/hls/` | Stream URLs |
+
+### Architectural Patterns
+| Pattern | Implementation | Rationale |
+|---------|---------------|-----------|
+| Video Controller Persistence | `VideoControllerManager` singleton | Prevents stream reload during drag-drop reordering |
+| State Management | `flutter_riverpod` | Clean separation, testable, supports complex multi-stream state |
+| UIUX Configurability | `ui_config.dart` constants | All timing/animation values tunable; expose in Settings later |
+
+### UIUX Directive
+> **All UIUX-related decisions should be user-configurable where sensible.** When adding new UIUX features, evaluate whether the setting should be exposed in the Settings screen for user customization.
+
+---
+
+## TODOs & Future Work
+
+### Phase 2: Chat System (Next)
+- [ ] Wire up search functionality (placeholder UI exists)
+- [ ] Implement `TwitchIrcClient` with WebSocket
+- [ ] Port IRC message parser from `irc-message.js`
+- [ ] Implement `EmoteService` (BTTV/FFZ/7TV)
+- [ ] Basic chat overlay rendering
+
+### Phase 4.5: OAuth & Personalization
+- [ ] Implement OAuth flow (local redirect server or device code)
+- [ ] **IMPORTANT:** When OAuth is added, redesign home screen for personalized experience:
+  - Followed channels (live first)
+  - Followed categories/games
+  - Recommendations based on watch history
+  - User's clips and VODs
+- [ ] **TODO (Release):** Revisit authenticated home page UIUX design before release
+
+### Backlog
+- [x] ~~Stream preview hover delay tunable (currently 300ms)~~ → Implemented in `ui_config.dart` (50ms default)
+- [x] ~~Sidebar animation duration tunable (currently 150ms)~~ → Implemented in `ui_config.dart`
+- [ ] VOD/Clip playback
+- [ ] Picture-in-Picture mode
+- [ ] 50/50 split view layout option
+- [ ] Desktop notifications for followed channels going live
+- [ ] Expose UIUX tunables in Settings screen
 
 ---
 
