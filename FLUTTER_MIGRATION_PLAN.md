@@ -1,8 +1,8 @@
 # SmartTwitchTV → Flutter Migration Plan
 
-> **Status:** In Progress v1.2  
+> **Status:** In Progress v1.3  
 > **Date:** February 3, 2026  
-> **Last Updated:** February 3, 2026  
+> **Last Updated:** February 4, 2026  
 > **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)
 
 ---
@@ -45,6 +45,8 @@
 - [x] Automatic re-preload when returning to home screen
 - [x] `streamPreviewQuality` tunable setting (default: 'auto')
 - [x] `streamPreviewAudioEnabled` tunable setting (default: true)
+- [x] **Pending play fix**: hover during preload now queues auto-play when controller ready
+- [x] Mouse exit clears pending play to prevent unwanted playback
 
 ### ✅ Package & Architecture Updates (COMPLETE)
 - [x] Upgraded all packages to latest versions (`flutter pub upgrade --major-versions`)

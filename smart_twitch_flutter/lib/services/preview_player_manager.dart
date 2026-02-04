@@ -46,6 +46,9 @@ class PreviewPlayerManager extends ChangeNotifier {
   String? _currentChannel;
   bool _isLoading = false;
   
+  // Pending play: channel that should auto-play when its controller becomes ready
+  String? _pendingPlay;
+
   // Getters
   String? get currentChannel => _currentChannel;
   bool get isLoading => _isLoading;
@@ -136,6 +139,17 @@ class PreviewPlayerManager extends ChangeNotifier {
       
       print('[PreviewManager] Controller ready for $channelLogin');
       
+      // Check if this channel was pending play (user hovered during preload)
+      if (_pendingPlay == channelLogin && _currentChannel == channelLogin) {
+        print('[PreviewManager] Auto-playing pending channel: $channelLogin');
+        await controller.setVolume(1.0);
+        await controller.play();
+        _controllers[channelLogin]!.isPlaying = true;
+        _pendingPlay = null;
+        _isLoading = false;
+        notifyListeners();
+      }
+      
     } catch (e) {
       print('[PreviewManager] Init failed for $channelLogin: $e');
       
@@ -173,6 +187,9 @@ class PreviewPlayerManager extends ChangeNotifier {
     if (preloaded != null) {
       print('[PreviewManager] INSTANT play for $channelLogin');
       
+      // Clear any pending play since we're playing now
+      _pendingPlay = null;
+      
       // Just play - it's already initialized!
       await preloaded.controller.setVolume(1.0);
       await preloaded.controller.play();
@@ -182,7 +199,16 @@ class PreviewPlayerManager extends ChangeNotifier {
       return;
     }
     
-    // Fallback: Initialize on-demand if not pre-loaded
+    // Check if controller is being initialized by preload - queue for auto-play
+    if (_initializing.contains(channelLogin)) {
+      print('[PreviewManager] Queuing play for $channelLogin (still initializing)');
+      _pendingPlay = channelLogin;
+      _isLoading = true;
+      notifyListeners();
+      return;  // Don't start duplicate init, just wait for preload to finish
+    }
+    
+    // Fallback: Initialize on-demand if not pre-loaded and not initializing
     print('[PreviewManager] On-demand load for $channelLogin (not pre-loaded)');
     
     _isLoading = true;
@@ -215,6 +241,9 @@ class PreviewPlayerManager extends ChangeNotifier {
   
   /// Stop the current preview (pause, don't dispose)
   void stopPreview() {
+    // Clear pending play - user moved mouse away
+    _pendingPlay = null;
+    
     if (_currentChannel != null && _controllers.containsKey(_currentChannel)) {
       final current = _controllers[_currentChannel]!;
       current.controller.pause();
@@ -238,6 +267,7 @@ class PreviewPlayerManager extends ChangeNotifier {
   
   /// Dispose all controllers (call when leaving home screen)
   Future<void> _disposeAllControllers() async {
+    _pendingPlay = null;  // Clear pending play on dispose
     for (final preloaded in _controllers.values) {
       await preloaded.controller.dispose();
     }
