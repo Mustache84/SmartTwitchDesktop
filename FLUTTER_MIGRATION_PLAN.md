@@ -63,6 +63,7 @@
 - [ ] Port IRC message parser from `irc-message.js`
 - [ ] Implement `EmoteService` (BTTV/FFZ/7TV)
 - [ ] Basic chat overlay rendering
+- [ ] **TODO: Delete `app/` folder after Phase 2 complete** (kept for JS reference during chat port)
 
 ---
 
