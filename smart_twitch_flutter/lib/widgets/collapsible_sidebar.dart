@@ -10,6 +10,7 @@ class CollapsibleSidebar extends StatefulWidget {
   final String? username;
   final String? avatarUrl;
   final VoidCallback? onLoginPressed;
+  final VoidCallback? onLogoutPressed;
   final VoidCallback? onHomePressed;
   final VoidCallback? onBrowsePressed;
   final VoidCallback? onSettingsPressed;
@@ -20,6 +21,7 @@ class CollapsibleSidebar extends StatefulWidget {
     this.username,
     this.avatarUrl,
     this.onLoginPressed,
+    this.onLogoutPressed,
     this.onHomePressed,
     this.onBrowsePressed,
     this.onSettingsPressed,
@@ -143,28 +145,50 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
       // Logged in user
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
+        child: Column(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: UIConfig.twitchPurple,
-              backgroundImage: widget.avatarUrl != null 
-                  ? NetworkImage(widget.avatarUrl!) 
-                  : null,
-              child: widget.avatarUrl == null 
-                  ? const Icon(Icons.person, color: Colors.white)
-                  : null,
-            ),
-            if (isExpanded) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  widget.username!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: UIConfig.twitchPurple,
+                  backgroundImage: widget.avatarUrl != null 
+                      ? NetworkImage(widget.avatarUrl!) 
+                      : null,
+                  child: widget.avatarUrl == null 
+                      ? const Icon(Icons.person, color: Colors.white, size: 20)
+                      : null,
+                ),
+                if (isExpanded) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.username!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
+                ],
+              ],
+            ),
+            // Logout button (only when expanded)
+            if (isExpanded) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: widget.onLogoutPressed,
+                  icon: const Icon(Icons.logout, size: 16, color: Colors.white54),
+                  label: const Text(
+                    'Sign out',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                  ),
                 ),
               ),
             ],
@@ -199,12 +223,15 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
                 const Icon(Icons.login, color: Colors.white, size: 20),
                 if (isExpanded) ...[
                   const SizedBox(width: 8),
-                  const Text(
-                    'Login to Twitch',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                  const Flexible(
+                    child: Text(
+                      'Login',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

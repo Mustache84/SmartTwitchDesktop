@@ -2,14 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fvp/fvp.dart' as fvp;
 
+/// Controller wrapper that exposes video player controls
+class TwitchPlayerController {
+  final VideoPlayerController _controller;
+  final void Function() _onReload;
+  
+  TwitchPlayerController(this._controller, this._onReload);
+  
+  /// Get the underlying video player controller
+  VideoPlayerController get videoController => _controller;
+  
+  /// Play the video
+  Future<void> play() => _controller.play();
+  
+  /// Pause the video
+  Future<void> pause() => _controller.pause();
+  
+  /// Toggle play/pause
+  Future<void> togglePlayPause() async {
+    if (_controller.value.isPlaying) {
+      await pause();
+    } else {
+      await play();
+    }
+  }
+  
+  /// Set volume (0.0 - 1.0)
+  Future<void> setVolume(double volume) => _controller.setVolume(volume.clamp(0.0, 1.0));
+  
+  /// Get current volume
+  double get volume => _controller.value.volume;
+  
+  /// Check if playing
+  bool get isPlaying => _controller.value.isPlaying;
+  
+  /// Reload the stream (forces re-fetch of HLS manifest)
+  void reload() => _onReload();
+  
+  /// Set playback speed (for catch-up in low latency mode)
+  Future<void> setPlaybackSpeed(double speed) => _controller.setPlaybackSpeed(speed);
+}
+
 class TwitchVideoWidget extends StatefulWidget {
   final String hlsUrl;
   final bool hasAudio;
+  final void Function(TwitchPlayerController controller)? onControllerReady;
   
   const TwitchVideoWidget({
     super.key,
     required this.hlsUrl,
     this.hasAudio = true,
+    this.onControllerReady,
   });
 
   @override
@@ -18,6 +61,7 @@ class TwitchVideoWidget extends StatefulWidget {
 
 class _TwitchVideoWidgetState extends State<TwitchVideoWidget> {
   late VideoPlayerController _controller;
+  TwitchPlayerController? _twitchController;
   bool _initialized = false;
   String? _error;
   
@@ -44,6 +88,10 @@ class _TwitchVideoWidgetState extends State<TwitchVideoWidget> {
       print('[VideoWidget] Player initialized successfully');
       _controller.setVolume(widget.hasAudio ? 1.0 : 0.0);
       await _controller.play();
+      
+      // Create the controller wrapper and notify
+      _twitchController = TwitchPlayerController(_controller, _reload);
+      widget.onControllerReady?.call(_twitchController!);
       
       setState(() {
         _initialized = true;
@@ -80,6 +128,15 @@ class _TwitchVideoWidgetState extends State<TwitchVideoWidget> {
     if (oldWidget.hasAudio != widget.hasAudio) {
       _controller.setVolume(widget.hasAudio ? 1.0 : 0.0);
     }
+  }
+  
+  void _reload() {
+    _controller.dispose();
+    setState(() {
+      _initialized = false;
+      _error = null;
+    });
+    _initializePlayer();
   }
   
   @override

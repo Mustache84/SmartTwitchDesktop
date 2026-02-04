@@ -4,11 +4,13 @@ import '../models/stream_preview.dart';
 import '../models/category_preview.dart';
 import '../services/twitch_browse_service.dart';
 import '../services/preview_player_manager.dart';
+import '../state/auth_provider.dart';
 import '../utils/ui_config.dart';
 import '../widgets/collapsible_sidebar.dart';
 import '../widgets/stream_preview_card.dart';
 import '../widgets/category_card.dart';
 import 'player_screen.dart';
+import 'login_screen.dart';
 
 /// Main home screen with featured streams and categories
 /// 
@@ -218,29 +220,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             left: 0,
             top: 0,
             bottom: 0,
-            child: CollapsibleSidebar(
-              isLoggedIn: false, // TODO: Wire up auth state
-              onHomePressed: () {
-                // Already on home
-              },
-              onBrowsePressed: () {
-                // TODO: Navigate to browse screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Browse - Coming soon!'),
-                    duration: Duration(seconds: 2),
-                    backgroundColor: UIConfig.twitchPurple,
-                  ),
-                );
-              },
-              onSettingsPressed: () {
-                // TODO: Navigate to settings screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings - Coming soon!'),
-                    duration: Duration(seconds: 2),
-                    backgroundColor: UIConfig.twitchPurple,
-                  ),
+            child: Consumer(
+              builder: (context, ref, child) {
+                final authState = ref.watch(authProvider);
+                return CollapsibleSidebar(
+                  isLoggedIn: authState.isAuthenticated,
+                  username: authState.userLogin,
+                  onLoginPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LoginScreen(),
+                      ),
+                    );
+                  },
+                  onLogoutPressed: () {
+                    ref.read(authProvider.notifier).logout();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Signed out successfully'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  onHomePressed: () {
+                    // Already on home
+                  },
+                  onBrowsePressed: () {
+                    // TODO: Navigate to browse screen
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Browse - Coming soon!'),
+                        duration: Duration(seconds: 2),
+                        backgroundColor: UIConfig.twitchPurple,
+                      ),
+                    );
+                  },
+                  onSettingsPressed: () {
+                    // TODO: Navigate to settings screen
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Settings - Coming soon!'),
+                        duration: Duration(seconds: 2),
+                        backgroundColor: UIConfig.twitchPurple,
+                      ),
+                    );
+                  },
                 );
               },
             ),

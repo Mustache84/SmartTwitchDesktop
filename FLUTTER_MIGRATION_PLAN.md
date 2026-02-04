@@ -1,6 +1,6 @@
 # SmartTwitchTV → Flutter Migration Plan
 
-> **Status:** In Progress v1.3  
+> **Status:** In Progress v1.5  
 > **Date:** February 3, 2026  
 > **Last Updated:** February 4, 2026  
 > **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)
@@ -57,9 +57,113 @@
 - [x] Migrated Riverpod state from v2 `StateNotifier` to v3 `Notifier` pattern
 - [x] Fixed CocoaPods dependencies for macOS build
 
-### 🔄 Next: Phase 2 - Chat System
+### ✅ Phase 1.5: OAuth Foundation (COMPLETE)
+OAuth is a prerequisite for player controls (subscription checks) and chat (authenticated messages).
+
+**Flow:** Device Code Grant (same as original SmartTwitchTV) - no client secret in binary, refresh tokens included.
+
+**Client ID:** `vrhsf9gxj2y4jntunres6mzber1fg1`
+
+**Scopes:** `chat:read chat:edit user:read:follows user:read:subscriptions`
+
+| Step | Description | Files | Status |
+|------|-------------|-------|--------|
+| 1.5.1 | Add `flutter_secure_storage`, `url_launcher` | `pubspec.yaml` | ✅ |
+| 1.5.2 | Secure token storage (Keychain/Credential Manager/libsecret) | `lib/services/secure_token_storage.dart` | ✅ |
+| 1.5.3 | Twitch auth service (Device Code Grant) | `lib/services/twitch_auth_service.dart` | ✅ |
+| 1.5.4 | Token manager with auto-refresh (<5min expiry) | `lib/services/token_manager.dart` | ✅ |
+| 1.5.5 | Auth state provider (Riverpod) | `lib/state/auth_provider.dart` | ✅ |
+| 1.5.6 | Login screen (device code display, twitch.tv/activate) | `lib/screens/login_screen.dart` | ✅ |
+| 1.5.7 | App routing (auth check on startup) | `main.dart` | ✅ |
+| 1.5.8 | Update `TwitchApiService` to use auth token when available | `lib/services/twitch_api_service.dart` | ✅ |
+| 1.5.9 | Sidebar login status with logout button | `lib/widgets/collapsible_sidebar.dart` | ✅ |
+
+**Auth Strategy:** Once authenticated, use auth token for ALL API calls. Anonymous flow only for logged-out users.
+
+**⚠️ TODO: Troubleshoot OAuth Client ID Issue**
+> The OAuth Client ID `vrhsf9gxj2y4jntunres6mzber1fg1` returns HTTP 400 "Client-ID header is invalid" when used for `PlaybackAccessToken` requests. Currently falling back to anonymous client IDs for stream tokens. Need to investigate:
+> - Is the Client ID registered correctly in Twitch Developer Console?
+> - Does PlaybackAccessToken require a different Client ID than user auth?
+> - Check if the Client ID was deleted/revoked
+
+---
+
+### ✅ Phase 1.6: Player Controls Foundation (COMPLETE)
+
+| Step | Description | Files | Status |
+|------|-------------|-------|--------|
+| 1.6.1 | Add `shared_preferences`, enable 1440p codecs (`av1,h265,h264`) | `pubspec.yaml`, `hls_url_builder.dart` | ✅ |
+| 1.6.2 | Settings service (unlimited per-channel quality storage) | `lib/services/settings_service.dart` | ✅ |
+| 1.6.3 | HLS manifest parser (quality enumeration from `#EXT-X-STREAM-INF`) | `lib/services/hls_manifest_service.dart` | ✅ |
+| 1.6.4 | Player controls state provider | `lib/state/player_controls_provider.dart` | ✅ |
+
+**Settings Storage Structure (via shared_preferences):**
+```json
+{
+  "quality.default": "auto",
+  "quality.perChannel": { "xqc": "1080p60", "lirik": "source" },
+  "latency.target": 2.0,
+  "latency.lowLatencyMode": true,
+  "player.volume": 0.8,
+  "player.muted": false
+}
+```
+
+**Per-Channel Storage:** Unlimited entries (~5KB per 100 channels). No eviction logic needed.
+
+---
+
+### ✅ Phase 1.7: Low Latency & Quality Selection (COMPLETE)
+
+| Step | Description | Files | Status |
+|------|-------------|-------|--------|
+| 1.7.1 | Low latency service (buffer control, latency presets) | `lib/services/low_latency_service.dart` | ✅ |
+| 1.7.2 | Quality selector widget (dropdown from manifest) | `lib/widgets/quality_selector.dart` | ✅ |
+| 1.7.3 | Latency slider widget (0.5s - 10s range) | `lib/widgets/latency_slider.dart` | ✅ |
+| 1.7.4 | Player controls overlay (play/pause, mute, volume) | `lib/screens/player_screen.dart` | ✅ |
+| 1.7.5 | Keyboard shortcuts (Space, M, L, H, ↑↓) | `lib/screens/player_screen.dart` | ✅ |
+| 1.7.6 | TwitchPlayerController wrapper for runtime control | `lib/widgets/video_widget.dart` | ✅ |
+
+**Low Latency Implementation:**
+- `fvp.registerWith(options: {'lowLatency': 1})` at startup
+- `setBufferRange(0, targetMs, true)` based on slider
+- Monitor `buffered()` vs target, adjust `setPlaybackRate(1.0-1.1)` for catch-up
+- Let MDK handle codec fallback gracefully (request `av1,h265,h264`, MDK picks best)
+
+---
+
+### � Phase 1.8: Full Player Controls + DVR (IN PROGRESS)
+
+| Step | Description | Files | Status |
+|------|-------------|-------|--------|
+| 1.8.1 | Auto-hide controls overlay after 3s inactivity | `lib/screens/player_screen.dart` | 🔲 |
+| 1.8.2 | Fullscreen toggle (F key) | `lib/screens/player_screen.dart` | 🔲 |
+| 1.8.3 | Stats overlay (Ctrl+D) | `lib/widgets/stats_overlay.dart` | 🔲 |
+| 1.8.4 | "Sync All Streams" for multi-stream | `multi_stream_notifier.dart` | 🔲 |
+| 1.8.5 | DVR/Rewind (check subscription via OAuth) | `lib/services/dvr_service.dart` | 🔲 |
+| 1.8.6 | Quality selection that switches stream | `lib/screens/player_screen.dart` | 🔲 |
+
+**Controls Overlay Features:**
+- Play/pause, mute/volume slider, quality dropdown, latency slider
+- Auto-hide after 3s inactivity, show on mouse move
+- Fullscreen toggle, stats overlay (Ctrl+D)
+
+**Keyboard Shortcuts:**
+| Key | Action |
+|-----|--------|
+| Space | Play/Pause |
+| M | Mute toggle |
+| F | Fullscreen toggle |
+| 1-9 | Quality selection |
+| L | Low latency toggle |
+| ↑↓ | Volume up/down |
+| ←→ | Seek (VOD only) |
+
+---
+
+### 🔲 Phase 2: Chat System
 - [ ] Wire up search functionality
-- [ ] Implement `TwitchIrcClient` with WebSocket
+- [ ] Implement `TwitchIrcClient` with WebSocket (auth or anonymous)
 - [ ] Port IRC message parser from `irc-message.js`
 - [ ] Implement `EmoteService` (BTTV/FFZ/7TV)
 - [ ] Basic chat overlay rendering
@@ -72,10 +176,15 @@
 ### API Configuration
 | Setting | Value | Notes |
 |---------|-------|-------|
-| Primary Client ID | `kd1unb4b3q4t58fwlpcbzcbnm76a8fp` | Decoded from Chat_token, most reliable |
+| **OAuth Client ID** | `vrhsf9gxj2y4jntunres6mzber1fg1` | Device Code Grant flow, user authentication |
+| **OAuth Scopes** | `chat:read chat:edit user:read:follows user:read:subscriptions` | Chat, follows, DVR eligibility |
+| Primary Client ID | `kd1unb4b3q4t58fwlpcbzcbnm76a8fp` | Anonymous token fetching (fallback) |
 | Fallback Client IDs | `ue666qo983tsx6so1t0vnawi233wa`, `kimne78kx3ncx6brgo4mv6wki5h1ko` | Used if primary rate-limited |
 | GraphQL Endpoint | `https://gql.twitch.tv/gql` | All token/browse queries |
 | HLS Manifest | `https://usher.ttvnw.net/api/channel/hls/` | Stream URLs |
+| Device Code Endpoint | `https://id.twitch.tv/oauth2/device` | OAuth device code request |
+| Token Endpoint | `https://id.twitch.tv/oauth2/token` | OAuth token polling/refresh |
+| Validate Endpoint | `https://id.twitch.tv/oauth2/validate` | Token validation |
 
 ### Architectural Patterns
 | Pattern | Implementation | Rationale |
@@ -91,16 +200,19 @@
 
 ## TODOs & Future Work
 
-### Phase 2: Chat System (Next)
+### Phase 1.5-1.8: OAuth + Player Controls (Current Priority)
+See detailed task lists in Progress Log above.
+
+### Phase 2: Chat System
 - [ ] Wire up search functionality (placeholder UI exists)
-- [ ] Implement `TwitchIrcClient` with WebSocket
+- [ ] Implement `TwitchIrcClient` with WebSocket (auth or anonymous)
 - [ ] Port IRC message parser from `irc-message.js`
 - [ ] Implement `EmoteService` (BTTV/FFZ/7TV)
 - [ ] Basic chat overlay rendering
+- [ ] Delete `app/` folder after complete
 
-### Phase 4.5: OAuth & Personalization
-- [ ] Implement OAuth flow (local redirect server or device code)
-- [ ] **IMPORTANT:** When OAuth is added, redesign home screen for personalized experience:
+### Phase 3: Personalized Home
+- [ ] **IMPORTANT:** With OAuth complete, redesign home screen for personalized experience:
   - Followed channels (live first)
   - Followed categories/games
   - Recommendations based on watch history
@@ -122,17 +234,24 @@
 
 This document outlines the complete migration of SmartTwitchTV from a Tauri/WebView hybrid application to a **native Flutter desktop application**. The core video engine will use **MDK via `fvp`** for hardware-accelerated playback. All Android TV legacy code will be eliminated.
 
-### Target Features (Ported from Original Plan)
-| Feature | Priority |
-|---------|----------|
-| Hardware-Accelerated HLS Playback | P0 |
-| 4-Way Multistream (Quad View) | P0 |
-| Live IRC Chat with Overlay | P0 |
-| BTTV/FFZ/7TV Emote Support | P1 |
-| Picture-in-Picture Mode | P1 |
-| 50/50 Split View | P1 |
-| Desktop Keyboard Shortcuts | P0 |
-| VOD/Clip Playback | P2 |
+### Target Features (Updated)
+| Feature | Priority | Status |
+|---------|----------|--------|
+| Hardware-Accelerated HLS Playback | P0 | ✅ Complete |
+| 4-Way Multistream (Quad View) | P0 | ✅ Complete |
+| Stream Preview on Hover | P0 | ✅ Complete |
+| **OAuth Authentication** | P0 | ✅ Complete |
+| **Player Controls Overlay** | P0 | ✅ Complete |
+| **Quality Selection (1440p/4K)** | P0 | ✅ UI Complete (switching pending) |
+| **Low Latency Mode** | P0 | ✅ Complete |
+| Desktop Keyboard Shortcuts | P0 | ✅ Complete |
+| Live IRC Chat with Overlay | P0 | 🔲 Phase 2 |
+| BTTV/FFZ/7TV Emote Support | P1 | 🔲 Phase 2 |
+| DVR/Rewind (Subscribers) | P1 | 🔲 Phase 1.8 |
+| Personalized Home (Follows) | P1 | 🔲 Phase 3 |
+| Picture-in-Picture Mode | P2 | 🔲 Backlog |
+| 50/50 Split View | P2 | 🔲 Backlog |
+| VOD/Clip Playback | P2 | 🔲 Backlog |
 
 ---
 
