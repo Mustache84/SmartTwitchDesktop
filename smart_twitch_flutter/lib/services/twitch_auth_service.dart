@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import '../config/twitch_constants.dart';
 
 /// Response from device code request
 class DeviceCodeResponse {
@@ -94,7 +95,7 @@ class AuthException implements Exception {
 }
 
 /// Twitch OAuth service using Device Code Grant Flow
-/// 
+///
 /// This is the same flow used by the original SmartTwitchTV - secure for
 /// desktop apps because no client secret is stored in the binary.
 class TwitchAuthService {
@@ -103,23 +104,12 @@ class TwitchAuthService {
   static const _validateUrl = 'https://id.twitch.tv/oauth2/validate';
   static const _revokeUrl = 'https://id.twitch.tv/oauth2/revoke';
 
-  /// OAuth Client ID for device code flow
-  static const clientId = 'vrhsf9gxj2y4jntunres6mzber1fg1';
-
-  /// Required scopes for app functionality
-  static const scopes = [
-    'chat:read',              // Read chat messages (IRC)
-    'chat:edit',              // Send chat messages (IRC)
-    'user:read:follows',      // Get followed channels
-    'user:read:subscriptions', // Check subscription status for DVR
-  ];
-
   final Dio _dio;
 
   TwitchAuthService({Dio? dio}) : _dio = dio ?? Dio();
 
   /// Step 1: Request a device code from Twitch
-  /// 
+  ///
   /// Returns a [DeviceCodeResponse] containing:
   /// - userCode: The code to show the user (e.g., "ABCD-1234")
   /// - verificationUri: URL where user enters the code (twitch.tv/activate)
@@ -130,8 +120,8 @@ class TwitchAuthService {
       final response = await _dio.post(
         _deviceCodeUrl,
         data: {
-          'client_id': clientId,
-          'scopes': scopes.join(' '),
+          'client_id': twitchClientId,
+          'scopes': twitchOAuthScopes.join(' '),
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
@@ -148,7 +138,7 @@ class TwitchAuthService {
   }
 
   /// Step 2: Poll for token after user authorizes
-  /// 
+  ///
   /// Returns null if authorization is still pending.
   /// Returns [TokenResponse] when user has authorized.
   /// Throws [AuthException] on errors (expired, denied, etc.)
@@ -157,7 +147,7 @@ class TwitchAuthService {
       final response = await _dio.post(
         _tokenUrl,
         data: {
-          'client_id': clientId,
+          'client_id': twitchClientId,
           'device_code': deviceCode,
           'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
         },
@@ -206,7 +196,7 @@ class TwitchAuthService {
       final response = await _dio.post(
         _tokenUrl,
         data: {
-          'client_id': clientId,
+          'client_id': twitchClientId,
           'refresh_token': refreshToken,
           'grant_type': 'refresh_token',
         },
@@ -262,7 +252,7 @@ class TwitchAuthService {
       await _dio.post(
         _revokeUrl,
         data: {
-          'client_id': clientId,
+          'client_id': twitchClientId,
           'token': accessToken,
         },
         options: Options(

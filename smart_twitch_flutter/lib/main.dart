@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'core/core.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/player_screen.dart';
 import 'services/settings_service.dart';
 import 'state/auth_provider.dart';
-import 'utils/ui_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,12 +24,12 @@ void main() async {
   await windowManager.ensureInitialized();
   
   WindowOptions windowOptions = const WindowOptions(
-    size: Size(1280, 720),
-    minimumSize: Size(800, 600),
+    size: Size(AppDimens.windowDefaultWidth, AppDimens.windowDefaultHeight),
+    minimumSize: Size(AppDimens.windowMinWidth, AppDimens.windowMinHeight),
     center: true,
-    backgroundColor: Colors.black,
+    backgroundColor: AppColors.background,
     titleBarStyle: TitleBarStyle.normal,
-    title: 'SmartTwitch Desktop',
+    title: AppStrings.appName,
   );
   
   windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -48,18 +48,18 @@ class SmartTwitchApp extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     
     return MaterialApp(
-      title: 'SmartTwitch Desktop',
+      title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: UIConfig.twitchDarkBg,
+        scaffoldBackgroundColor: AppColors.background,
         colorScheme: const ColorScheme.dark(
-          primary: UIConfig.twitchPurple,
-          secondary: UIConfig.twitchPurple,
-          surface: UIConfig.twitchSurface,
+          primary: AppColors.primary,
+          secondary: AppColors.secondary,
+          surface: AppColors.surface,
         ),
         snackBarTheme: const SnackBarThemeData(
-          backgroundColor: UIConfig.twitchSurface,
-          contentTextStyle: TextStyle(color: Colors.white),
+          backgroundColor: AppColors.surface,
+          contentTextStyle: TextStyle(color: AppColors.textPrimary),
         ),
       ),
       // Named routes for navigation
@@ -92,18 +92,18 @@ class _AuthLoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Color(0xFF0E0E10),
+      backgroundColor: AppColors.background,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              color: Color(0xFF9146FF),
+              color: AppColors.primary,
             ),
-            SizedBox(height: 16),
+            SizedBox(height: AppDimens.paddingMedium),
             Text(
-              'Loading...',
-              style: TextStyle(color: Colors.white70),
+              AppStrings.textLoading,
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),

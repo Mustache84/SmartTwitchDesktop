@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/category_preview.dart';
-import '../utils/ui_config.dart';
+import '../core/core.dart';
 
 /// Category/game card for browse screen
 class CategoryCard extends StatefulWidget {
@@ -32,7 +32,7 @@ class _CategoryCardState extends State<CategoryCard> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _isHovered ? UIConfig.twitchPurple : Colors.transparent,
+              color: _isHovered ? AppColors.primary : Colors.transparent,
               width: 2,
             ),
           ),
@@ -50,7 +50,7 @@ class _CategoryCardState extends State<CategoryCard> {
                         widget.category.boxArtUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: UIConfig.twitchSurface,
+                          color: AppColors.surface,
                           child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -93,7 +93,7 @@ class _CategoryCardState extends State<CategoryCard> {
                 // Category info
                 Container(
                   padding: const EdgeInsets.all(8),
-                  color: UIConfig.twitchSurface,
+                  color: AppColors.surface,
                   width: double.infinity,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

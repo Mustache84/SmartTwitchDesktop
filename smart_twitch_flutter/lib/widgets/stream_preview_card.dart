@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../models/stream_preview.dart';
-import '../utils/ui_config.dart';
+import '../core/core.dart';
 import '../services/preview_player_manager.dart';
 
 /// Stream preview card with hover-to-play functionality
@@ -69,7 +69,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
   
   void _startHoverTimer() {
     _hoverTimer?.cancel();
-    _hoverTimer = Timer(UIConfig.streamPreviewHoverDelay, () {
+    _hoverTimer = Timer(AppDurations.streamPreviewHoverDelay, () {
       if (mounted && (_isHovered || widget.isFocused)) {
         setState(() => _shouldShowPreview = true);
         _previewManager.startPreview(widget.stream.login);
@@ -134,7 +134,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: (_isHovered || widget.isFocused) 
-                    ? UIConfig.twitchPurple 
+                    ? AppColors.primary 
                     : Colors.transparent,
                 width: 2,
               ),
@@ -146,7 +146,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
                 children: [
                   // Thumbnail / Video preview
                   AspectRatio(
-                    aspectRatio: UIConfig.streamCardAspectRatio,
+                    aspectRatio: AppDimens.streamCardAspectRatio,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -155,7 +155,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
                           widget.stream.previewImageUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                            color: UIConfig.twitchSurface,
+                            color: AppColors.surface,
                             child: const Center(
                               child: Icon(Icons.image_not_supported, 
                                   color: Colors.white24),
@@ -178,7 +178,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
                             color: Colors.black45,
                             child: const Center(
                               child: CircularProgressIndicator(
-                                color: UIConfig.twitchPurple,
+                                color: AppColors.primary,
                                 strokeWidth: 2,
                               ),
                             ),
@@ -216,7 +216,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
                             padding: const EdgeInsets.symmetric(
                               horizontal: 4, vertical: 2),
                             decoration: BoxDecoration(
-                              color: UIConfig.liveIndicatorRed,
+                              color: AppColors.liveRed,
                               borderRadius: BorderRadius.circular(3),
                             ),
                             child: const Text(
@@ -288,14 +288,14 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
                   // Stream info below thumbnail
                   Container(
                     padding: const EdgeInsets.all(8),
-                    color: UIConfig.twitchSurface,
+                    color: AppColors.surface,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Streamer avatar
                         CircleAvatar(
                           radius: 18,
-                          backgroundColor: UIConfig.twitchPurple,
+                          backgroundColor: AppColors.primary,
                           backgroundImage: widget.stream.profileImageUrl.isNotEmpty
                               ? NetworkImage(widget.stream.profileImageUrl)
                               : null,
@@ -335,7 +335,7 @@ class _StreamPreviewCardState extends State<StreamPreviewCard> {
                                       padding: EdgeInsets.only(left: 4),
                                       child: Icon(
                                         Icons.verified,
-                                        color: UIConfig.twitchPurple,
+                                        color: AppColors.primary,
                                         size: 14,
                                       ),
                                     ),

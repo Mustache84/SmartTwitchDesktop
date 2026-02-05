@@ -1,37 +1,20 @@
 import 'package:dio/dio.dart';
 import '../models/stream_preview.dart';
 import '../models/category_preview.dart';
+import '../config/twitch_constants.dart';
 
 /// Service for fetching Twitch browse data (streams, categories, search)
-/// 
+///
 /// Uses Twitch GraphQL API for all queries. Ported from app/specific/Screens.js
 class TwitchBrowseService {
-  static const String _gqlEndpoint = 'https://gql.twitch.tv/gql';
-  
-  // Client IDs - same as TwitchApiService for consistency
-  static const List<String> _clientIds = [
-    'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',  // Primary (decoded Chat_token)
-    'ue6666qo983tsx6so1t0vnawi233wa',   // Fallback 1
-    'kimne78kx3ncx6brgo4mv6wki5h1ko',   // Fallback 2
-  ];
-  
   final Dio _dio;
-  int _currentClientIdIndex = 0;
-  
+
   TwitchBrowseService({Dio? dio}) : _dio = dio ?? Dio();
-  
-  String get _currentClientId => _clientIds[_currentClientIdIndex];
-  
+
   Map<String, String> get _headers => {
-    'Client-ID': _currentClientId,
+    'Client-ID': twitchGqlClientId,
     'Content-Type': 'application/json',
   };
-  
-  /// Rotate to next client ID on failure
-  void _rotateClientId() {
-    _currentClientIdIndex = (_currentClientIdIndex + 1) % _clientIds.length;
-    print('[TwitchBrowseService] Rotating to client ID: $_currentClientId');
-  }
   
   /// Fetch featured/recommended streams
   /// 
@@ -65,7 +48,7 @@ class TwitchBrowseService {
     
     try {
       final response = await _dio.post(
-        _gqlEndpoint,
+        twitchGqlEndpoint,
         data: {'query': query},
         options: Options(headers: _headers),
       );
@@ -133,7 +116,7 @@ class TwitchBrowseService {
     
     try {
       final response = await _dio.post(
-        _gqlEndpoint,
+        twitchGqlEndpoint,
         data: {'query': query},
         options: Options(headers: _headers),
       );
@@ -155,7 +138,6 @@ class TwitchBrowseService {
       }
     } catch (e) {
       print('[TwitchBrowseService] Top streams error: $e');
-      _rotateClientId();
       return [];
     }
   }
@@ -182,7 +164,7 @@ class TwitchBrowseService {
     
     try {
       final response = await _dio.post(
-        _gqlEndpoint,
+        twitchGqlEndpoint,
         data: {'query': query},
         options: Options(headers: _headers),
       );
@@ -210,7 +192,6 @@ class TwitchBrowseService {
       }
     } catch (e) {
       print('[TwitchBrowseService] Games error: $e');
-      _rotateClientId();
       return [];
     }
   }

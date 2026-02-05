@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'token_manager.dart';
+import '../config/twitch_constants.dart';
 
 class PlaybackToken {
   final String token;
@@ -27,23 +28,6 @@ class TwitchApiService {
   final Dio _dio;
   final TokenManager _tokenManager = TokenManager();
   
-  // Client ID from original app - decoded from Chat_token base64
-  // Original base64: 'a2QxdW5iNGIzcTR0NThmd2xwY2J6Y2JubTc2YThmcA=='
-  static const _primaryClientId = 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp';
-  
-  // OAuth Client ID (for authenticated requests)
-  static const _oauthClientId = 'vrhsf9gxj2y4jntunres6mzber1fg1';
-  
-  // Fallback client IDs in case primary gets rate-limited (anonymous only)
-  static const _fallbackClientIds = [
-    'kd1unb4b3q4t58fwlpcbzcbnm76a8fp',  // Primary (Chat_token decoded)
-    'ue666qo983tsx6so1t0vnawi233wa',     // AddCode_backup_client_id decoded
-    'kimne78kx3ncx6brgo4mv6wki5h1ko',   // Old Twitch web client
-  ];
-  
-  static const _gqlEndpoint = 'https://gql.twitch.tv/gql';
-  static const _helixEndpoint = 'https://api.twitch.tv/helix';
-  
   // Port from PlayHLS.js: Play_live_token - MUST be single-line compact JSON
   static const _liveTokenQueryTemplate = 
       '{"extensions":{"persistedQuery":{"sha256Hash":"ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9","version":1}},"operationName":"PlaybackAccessToken","variables":{"isLive":true,"isVod":false,"login":"%LOGIN%","platform":"web","playerType":"site","vodID":""}}';
@@ -69,95 +53,62 @@ class TwitchApiService {
   
   /// Fetches playback access token for a live channel
   /// Port of PlayHLS_GetToken() from PlayHLS.js
-  /// 
-  /// If authenticated, uses OAuth token for potentially better quality/features.
-  /// Falls back to anonymous client IDs if not authenticated or on failure.
+  ///
+  /// Uses the registered OAuth client ID for all requests.
+  /// If authenticated, includes Bearer token for subscriber features.
   Future<PlaybackToken> getPlaybackToken(String channelLogin) async {
     final query = _liveTokenQueryTemplate.replaceAll('%LOGIN%', channelLogin.toLowerCase());
-    
-    TwitchApiException? lastException;
-    
-    // Try authenticated request first if available
+
+    // Check if user is authenticated
     final accessToken = await _tokenManager.getValidToken();
+
+    // GraphQL requires "blessed" client ID (not our OAuth client ID)
+    final headers = {
+      'Client-ID': twitchGqlClientId,
+      'Content-Type': 'application/json',
+    };
+
+    // Add auth token if available (for subscriber features)
     if (accessToken != null) {
-      try {
-        print('[TwitchApiService] Trying authenticated request...');
-        
-        final response = await _dio.post(
-          _gqlEndpoint,
-          data: query,
-          options: Options(
-            headers: {
-              'Authorization': 'Bearer $accessToken',
-              'Client-ID': _oauthClientId,
-              'Content-Type': 'application/json',
-            },
-          ),
-        );
-        
-        if (response.statusCode == 200) {
-          final token = _parsePlaybackToken(response.data, channelLogin);
-          if (token != null) {
-            print('[TwitchApiService] Authenticated request succeeded for $channelLogin');
-            return token;
-          }
-        }
-      } on DioException catch (e) {
-        print('[TwitchApiService] Authenticated request failed: ${e.message}');
-        // Fall through to anonymous requests
-      }
+      headers['Authorization'] = 'Bearer $accessToken';
+      print('[TwitchApiService] Using authenticated request for $channelLogin');
+    } else {
+      print('[TwitchApiService] Using anonymous request for $channelLogin');
     }
-    
-    // Try each anonymous client ID until one works
-    for (final clientId in _fallbackClientIds) {
-      try {
-        print('[TwitchApiService] Trying anonymous client ID: ${clientId.substring(0, 8)}...');
-        
-        final response = await _dio.post(
-          _gqlEndpoint,
-          data: query,
-          options: Options(
-            headers: {
-              'Client-ID': clientId,
-              'Content-Type': 'application/json',
-            },
-          ),
-        );
-        
-        if (response.statusCode == 200) {
-          final token = _parsePlaybackToken(response.data, channelLogin);
-          if (token != null) {
-            print('[TwitchApiService] Success! Got token for $channelLogin');
-            return token;
-          }
-        }
-      } on DioException catch (e) {
-        print('[TwitchApiService] Failed with client ID ${clientId.substring(0, 8)}...: ${e.message}');
-        lastException = TwitchApiException(
-          'Network error: ${e.message}',
-          statusCode: e.response?.statusCode,
-          originalError: e,
-        );
-        // Continue to next client ID
-        continue;
-      } on TwitchApiException {
-        rethrow; // Channel offline - don't try other client IDs
+
+    try {
+      final response = await _dio.post(
+        twitchGqlEndpoint,
+        data: query,
+        options: Options(headers: headers),
+      );
+
+      if (response.statusCode == 200) {
+        final token = _parsePlaybackToken(response.data, channelLogin);
+        print('[TwitchApiService] Successfully got playback token for $channelLogin');
+        return token;
       }
+
+      throw TwitchApiException('Unexpected status code: ${response.statusCode}');
+    } on DioException catch (e) {
+      throw TwitchApiException(
+        'Failed to get playback token: ${e.message}',
+        statusCode: e.response?.statusCode,
+        originalError: e,
+      );
     }
-    
-    throw lastException ?? TwitchApiException('All client IDs failed');
   }
   
   /// Parse playback token from GQL response
-  PlaybackToken? _parsePlaybackToken(dynamic data, String channelLogin) {
+  PlaybackToken _parsePlaybackToken(dynamic data, String channelLogin) {
     final accessToken = data['data']?['streamPlaybackAccessToken'];
-    
+
     if (accessToken == null) {
       throw TwitchApiException(
         'Channel "$channelLogin" is offline or does not exist',
       );
     }
-    
+
     return PlaybackToken(
       token: accessToken['value'] as String,
       signature: accessToken['signature'] as String,
@@ -171,24 +122,24 @@ class TwitchApiService {
     if (accessToken == null) {
       throw TwitchApiException('Not authenticated');
     }
-    
+
     try {
       // First get the user ID
       final userResponse = await _dio.get(
-        '$_helixEndpoint/users',
+        '$twitchHelixEndpoint/users',
         options: Options(
           headers: {
             'Authorization': 'Bearer $accessToken',
-            'Client-ID': _oauthClientId,
+            'Client-ID': twitchClientId,
           },
         ),
       );
-      
+
       final userId = userResponse.data['data'][0]['id'];
-      
+
       // Then get followed channels
       final followsResponse = await _dio.get(
-        '$_helixEndpoint/channels/followed',
+        '$twitchHelixEndpoint/channels/followed',
         queryParameters: {
           'user_id': userId,
           'first': 100,
@@ -196,11 +147,11 @@ class TwitchApiService {
         options: Options(
           headers: {
             'Authorization': 'Bearer $accessToken',
-            'Client-ID': _oauthClientId,
+            'Client-ID': twitchClientId,
           },
         ),
       );
-      
+
       final follows = followsResponse.data['data'] as List;
       return follows
           .map((f) => f['broadcaster_login'] as String)
@@ -220,24 +171,24 @@ class TwitchApiService {
     if (accessToken == null) {
       return false;
     }
-    
+
     try {
       // First get the user ID
       final userResponse = await _dio.get(
-        '$_helixEndpoint/users',
+        '$twitchHelixEndpoint/users',
         options: Options(
           headers: {
             'Authorization': 'Bearer $accessToken',
-            'Client-ID': _oauthClientId,
+            'Client-ID': twitchClientId,
           },
         ),
       );
-      
+
       final userId = userResponse.data['data'][0]['id'];
-      
+
       // Check subscription
       final subResponse = await _dio.get(
-        '$_helixEndpoint/subscriptions/user',
+        '$twitchHelixEndpoint/subscriptions/user',
         queryParameters: {
           'broadcaster_id': broadcasterId,
           'user_id': userId,
@@ -245,14 +196,14 @@ class TwitchApiService {
         options: Options(
           headers: {
             'Authorization': 'Bearer $accessToken',
-            'Client-ID': _oauthClientId,
+            'Client-ID': twitchClientId,
           },
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-      
+
       // 200 means subscribed, 404 means not subscribed
-      return subResponse.statusCode == 200 && 
+      return subResponse.statusCode == 200 &&
              (subResponse.data['data'] as List).isNotEmpty;
     } on DioException {
       return false;

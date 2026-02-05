@@ -5,7 +5,7 @@ import '../models/category_preview.dart';
 import '../services/twitch_browse_service.dart';
 import '../services/preview_player_manager.dart';
 import '../state/auth_provider.dart';
-import '../utils/ui_config.dart';
+import '../core/core.dart';
 import '../widgets/collapsible_sidebar.dart';
 import '../widgets/stream_preview_card.dart';
 import '../widgets/category_card.dart';
@@ -67,7 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     try {
       final streams = await _browseService.getFeaturedStreams(
-        limit: UIConfig.homeScreenStreamCount,
+        limit: AppDimens.homeStreamCount,
       );
       
       if (mounted) {
@@ -98,7 +98,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     try {
       final categories = await _browseService.getTopGames(
-        limit: UIConfig.homeScreenCategoryCount,
+        limit: AppDimens.homeCategoryCount,
       );
       
       if (mounted) {
@@ -139,7 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       SnackBar(
         content: Text('Browse ${category.displayName} - Coming soon!'),
         duration: const Duration(seconds: 2),
-        backgroundColor: UIConfig.twitchPurple,
+        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -152,7 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       SnackBar(
         content: Text('Search "$query" - Coming soon!'),
         duration: const Duration(seconds: 2),
-        backgroundColor: UIConfig.twitchPurple,
+        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -160,7 +160,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: UIConfig.twitchDarkBg,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           // Main content
@@ -173,10 +173,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: _loadData,
-                  color: UIConfig.twitchPurple,
+                  color: AppColors.primary,
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.only(
-                      left: UIConfig.sidebarCollapsedWidth + 16,
+                      left: AppDimens.sidebarCollapsedWidth + 16,
                       right: 16,
                       top: 16,
                       bottom: 24,
@@ -251,7 +251,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SnackBar(
                         content: Text('Browse - Coming soon!'),
                         duration: Duration(seconds: 2),
-                        backgroundColor: UIConfig.twitchPurple,
+                        backgroundColor: AppColors.primary,
                       ),
                     );
                   },
@@ -261,7 +261,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SnackBar(
                         content: Text('Settings - Coming soon!'),
                         duration: Duration(seconds: 2),
-                        backgroundColor: UIConfig.twitchPurple,
+                        backgroundColor: AppColors.primary,
                       ),
                     );
                   },
@@ -278,16 +278,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: UIConfig.twitchSurface,
+      color: AppColors.surface,
       child: Row(
         children: [
           // Space for sidebar
-          const SizedBox(width: UIConfig.sidebarCollapsedWidth),
+          const SizedBox(width: AppDimens.sidebarCollapsedWidth),
           
           // Logo / Title
           const Row(
             children: [
-              Icon(Icons.live_tv, color: UIConfig.twitchPurple, size: 28),
+              Icon(Icons.live_tv, color: AppColors.primary, size: 28),
               SizedBox(width: 8),
               Text(
                 'SmartTwitch',
@@ -314,7 +314,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   hintText: 'Search...',
                   hintStyle: const TextStyle(color: Colors.white38),
                   filled: true,
-                  fillColor: UIConfig.twitchDarkBg,
+                  fillColor: AppColors.background,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(6),
@@ -342,7 +342,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }) {
     return Row(
       children: [
-        Icon(icon, color: UIConfig.twitchPurple, size: 24),
+        Icon(icon, color: AppColors.primary, size: 24),
         const SizedBox(width: 8),
         Text(
           title,
@@ -358,7 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: onSeeAll,
             child: const Text(
               'See all',
-              style: TextStyle(color: UIConfig.twitchPurple),
+              style: TextStyle(color: AppColors.primary),
             ),
           ),
       ],
@@ -368,16 +368,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildFeaturedStreams() {
     if (_isLoadingStreams) {
       return SizedBox(
-        height: UIConfig.streamCardHeight + 80,
+        height: AppDimens.streamCardHeight + 80,
         child: const Center(
-          child: CircularProgressIndicator(color: UIConfig.twitchPurple),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
     }
     
     if (_streamsError != null) {
       return SizedBox(
-        height: UIConfig.streamCardHeight + 80,
+        height: AppDimens.streamCardHeight + 80,
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -392,7 +392,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ElevatedButton(
                 onPressed: _loadFeaturedStreams,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: UIConfig.twitchPurple,
+                  backgroundColor: AppColors.primary,
                 ),
                 child: const Text('Retry'),
               ),
@@ -404,7 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     if (_featuredStreams.isEmpty) {
       return SizedBox(
-        height: UIConfig.streamCardHeight + 80,
+        height: AppDimens.streamCardHeight + 80,
         child: const Center(
           child: Text(
             'No live streams found',
@@ -415,7 +415,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     
     return SizedBox(
-      height: UIConfig.streamCardHeight + 90,
+      height: AppDimens.streamCardHeight + 90,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _featuredStreams.length,
@@ -426,7 +426,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               right: index < _featuredStreams.length - 1 ? 16 : 0,
             ),
             child: SizedBox(
-              width: UIConfig.streamCardHeight * UIConfig.streamCardAspectRatio,
+              width: AppDimens.streamCardHeight * AppDimens.streamCardAspectRatio,
               child: StreamPreviewCard(
                 stream: stream,
                 onTap: () => _onStreamTap(stream),
@@ -441,16 +441,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildCategories() {
     if (_isLoadingCategories) {
       return SizedBox(
-        height: UIConfig.categoryCardHeight + 60,
+        height: AppDimens.categoryCardHeight + 60,
         child: const Center(
-          child: CircularProgressIndicator(color: UIConfig.twitchPurple),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       );
     }
     
     if (_categoriesError != null) {
       return SizedBox(
-        height: UIConfig.categoryCardHeight + 60,
+        height: AppDimens.categoryCardHeight + 60,
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -465,7 +465,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ElevatedButton(
                 onPressed: _loadCategories,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: UIConfig.twitchPurple,
+                  backgroundColor: AppColors.primary,
                 ),
                 child: const Text('Retry'),
               ),
@@ -477,7 +477,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     if (_categories.isEmpty) {
       return SizedBox(
-        height: UIConfig.categoryCardHeight + 60,
+        height: AppDimens.categoryCardHeight + 60,
         child: const Center(
           child: Text(
             'No categories found',
@@ -488,7 +488,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     
     return SizedBox(
-      height: UIConfig.categoryCardHeight + 50,
+      height: AppDimens.categoryCardHeight + 50,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _categories.length,
@@ -499,7 +499,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               right: index < _categories.length - 1 ? 12 : 0,
             ),
             child: SizedBox(
-              width: (UIConfig.categoryCardHeight - 50) * UIConfig.categoryCardAspectRatio,
+              width: (AppDimens.categoryCardHeight - 50) * AppDimens.categoryCardAspectRatio,
               child: CategoryCard(
                 category: category,
                 onTap: () => _onCategoryTap(category),

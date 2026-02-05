@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/ui_config.dart';
+import '../core/core.dart';
 
 /// Collapsible sidebar that slides over content
 /// 
@@ -41,15 +41,15 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: UIConfig.sidebarAnimationDuration,
+      duration: AppDurations.sidebarAnimation,
       vsync: this,
     );
     _widthAnimation = Tween<double>(
-      begin: UIConfig.sidebarCollapsedWidth,
-      end: UIConfig.sidebarExpandedWidth,
+      begin: AppDimens.sidebarCollapsedWidth,
+      end: AppDimens.sidebarExpandedWidth,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: UIConfig.sidebarAnimationCurve,
+      curve: AppCurves.sidebar,
     ));
   }
   
@@ -85,7 +85,7 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
             width: _widthAnimation.value,
             height: double.infinity,
             decoration: BoxDecoration(
-              color: UIConfig.twitchSurface,
+              color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.3),
@@ -139,7 +139,7 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
   }
   
   Widget _buildProfileSection() {
-    final isExpanded = _widthAnimation.value > UIConfig.sidebarCollapsedWidth + 20;
+    final isExpanded = _widthAnimation.value > AppDimens.sidebarCollapsedWidth + 20;
     
     if (widget.isLoggedIn && widget.username != null) {
       // Logged in user
@@ -151,7 +151,7 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: UIConfig.twitchPurple,
+                  backgroundColor: AppColors.primary,
                   backgroundImage: widget.avatarUrl != null 
                       ? NetworkImage(widget.avatarUrl!) 
                       : null,
@@ -206,7 +206,7 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
               const SnackBar(
                 content: Text('Login coming soon!'),
                 duration: Duration(seconds: 2),
-                backgroundColor: UIConfig.twitchPurple,
+                backgroundColor: AppColors.primary,
               ),
             );
           },
@@ -214,7 +214,7 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
             decoration: BoxDecoration(
-              color: UIConfig.twitchPurple,
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -248,7 +248,7 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
     required String label,
     VoidCallback? onTap,
   }) {
-    final isExpanded = _widthAnimation.value > UIConfig.sidebarCollapsedWidth + 20;
+    final isExpanded = _widthAnimation.value > AppDimens.sidebarCollapsedWidth + 20;
     
     return Material(
       color: Colors.transparent,
