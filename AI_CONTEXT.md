@@ -1,14 +1,25 @@
 # AI Agent Context File
 
-> **Last Updated:** February 4, 2026  
-> **Current Phase:** 1.8 (Full Player Controls + DVR)  
+> **Last Updated:** February 5, 2026  
+> **Current Phase:** 1.9 (Headless Integrity & Noise Engine) - **BLOCKING PRIORITY**  
+> **Target Platforms:** macOS, Windows (Linux removed)  
 > **For detailed task breakdown, see:** `FLUTTER_MIGRATION_PLAN.md`
+
+---
+
+## ⚠️ CRITICAL: Phase 1.9 Architecture Pivot
+
+Twitch now requires `Client-Integrity` tokens for playback. Static client IDs are being blocked. Phase 1.9 implements a "Ghost Browser" to harvest valid integrity tokens.
+
+**The Problem:** Direct GQL calls with static client IDs return 403 Forbidden.
+
+**The Solution:** Hidden WebView runs real Twitch site, intercepts integrity tokens, syncs cookies to `fvp` player.
 
 ---
 
 ## Project Overview
 
-**SmartTwitchDesktop** is a native Flutter desktop app (macOS/Windows/Linux) for watching Twitch streams. It's a migration from the original SmartTwitchTV Android/web app, keeping the JS codebase in `app/` as reference only.
+**SmartTwitchDesktop** is a native Flutter desktop app (macOS/Windows) for watching Twitch streams. It's a migration from the original SmartTwitchTV Android/web app, keeping the JS codebase in `app/` as reference only.
 
 ### Tech Stack
 | Component | Technology |
@@ -17,6 +28,7 @@
 | Video Engine | `fvp` v0.35.2 (MDK-based, hardware-accelerated) |
 | State Management | `flutter_riverpod` v3.1.0 (Notifier pattern) |
 | HTTP | `dio` v5.7.0 |
+| **Headless Browser** | `flutter_inappwebview` v6.1.0 (Phase 1.9) |
 | Twitch API | GraphQL via `gql.twitch.tv/gql` |
 
 ### Project Structure
@@ -25,12 +37,14 @@ SmartTwitchDesktop/
 ├── smart_twitch_flutter/     # Flutter app (active development)
 │   ├── lib/
 │   │   ├── main.dart
-│   │   ├── models/           # Data models
+│   │   ├── config/           # Constants (twitch_constants, browser_constants)
+│   │   ├── models/           # Data models (TwitchSession)
 │   │   ├── screens/          # Full-page screens
-│   │   ├── services/         # API, video, auth services
-│   │   ├── state/            # Riverpod providers
-│   │   ├── utils/            # Helpers, config
+│   │   ├── services/         # API, video, auth, integrity services
+│   │   ├── state/            # Riverpod providers (auth, integrity, player)
+│   │   ├── utils/            # Helpers, config, AppLogger
 │   │   └── widgets/          # Reusable UI components
+│   ├── CHANGELOG.md          # Version history
 │   └── pubspec.yaml
 ├── app/                      # Original JS codebase (REFERENCE ONLY - delete after Phase 2)
 ├── FLUTTER_MIGRATION_PLAN.md # Detailed roadmap with task lists
@@ -86,23 +100,54 @@ SmartTwitchDesktop/
 
 ---
 
-## Current Work: Phase 1.8 - Full Player Controls + DVR
+## Current Work: Phase 1.9 - Headless Integrity Engine
 
-Finalizing player controls and adding DVR/rewind support.
+**BLOCKING PRIORITY** - Playback will fail without this.
 
-### Phase 1.8 Task List
-1. [ ] Auto-hide controls overlay after 3s inactivity
-2. [ ] Fullscreen toggle (F key)
-3. [ ] Stats overlay (Ctrl+D)
-4. [ ] "Sync All Streams" for multi-stream
-5. [ ] DVR/Rewind (check subscription via OAuth)
-6. [ ] Quality selection that actually switches the stream (currently saves preference only)
+### Architecture: Ghost Browser
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Flutter App (MaterialApp)                                  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Stack                                                 │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │  Main UI (HomeScreen, PlayerScreen, etc.)       │  │  │
+│  │  └─────────────────────────────────────────────────┘  │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │  Ghost WebView (1x1 pixel, behind UI)           │  │  │
+│  │  │  - Loads twitch.tv                              │  │  │
+│  │  │  - Intercepts GQL → extracts Client-Integrity   │  │  │
+│  │  │  - Blocks .ts/.m3u8/video-weaver URLs           │  │  │
+│  │  │  - Syncs cookies to fvp                         │  │  │
+│  │  └─────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Phase 1.9 Task List
+| # | Task | File | Status |
+|---|------|------|--------|
+| 1 | Add `flutter_inappwebview` dependency | `pubspec.yaml` | 🔲 |
+| 2 | Update macOS entitlements (JIT, audio-input) | `macos/Runner/*.entitlements` | 🔲 |
+| 3 | Delete Linux target folder | `linux/` | 🔲 |
+| 4 | Create `BrowserConstants` (User-Agent) | `lib/config/browser_constants.dart` | 🔲 |
+| 5 | Create `AppLogger` utility | `lib/utils/app_logger.dart` | 🔲 |
+| 6 | Create `TwitchSession` model | `lib/models/twitch_session.dart` | 🔲 |
+| 7 | Create `TwitchIntegrityService` | `lib/services/twitch_integrity_service.dart` | 🔲 |
+| 8 | Create `IntegrityProvider` | `lib/state/integrity_provider.dart` | 🔲 |
+| 9 | Create `BehavioralNoiseService` | `lib/services/behavioral_noise_service.dart` | 🔲 |
+| 10 | Create `CaptchaModal` | `lib/widgets/captcha_modal.dart` | 🔲 |
+| 11 | Create `IntegritySpinner` | `lib/widgets/integrity_spinner.dart` | 🔲 |
+| 12 | Add `WidgetsBindingObserver` | `lib/main.dart` | 🔲 |
+| 13 | Refactor `TwitchApiService` | `lib/services/twitch_api_service.dart` | 🔲 |
+| 14 | Update `VideoWidget` | `lib/widgets/video_widget.dart` | 🔲 |
+| 15 | Replace all `print()` | All files | 🔲 |
 
 ---
 
 ## Upcoming Phases
 
-### Phase 1.8: Full Player Controls + DVR (Current)
+### Phase 1.8: Full Player Controls + DVR (Deferred)
 - Auto-hide controls overlay after 3s inactivity
 - Fullscreen toggle, stats overlay
 - "Sync All Streams" for multi-stream
@@ -120,9 +165,29 @@ Finalizing player controls and adding DVR/rewind support.
 
 ## Key Files to Know
 
+### Existing Files (Phase 1.9 will modify)
+| File | Purpose | Phase 1.9 Changes |
+|------|---------|-------------------|
+| `lib/services/twitch_api_service.dart` | GraphQL token fetching | Inject integrity headers |
+| `lib/widgets/video_widget.dart` | Video player | Add harvested cookies/UA |
+| `lib/main.dart` | App entry point | Add WidgetsBindingObserver |
+| `lib/config/twitch_constants.dart` | API constants | Static client IDs deprecated |
+
+### New Files (Phase 1.9 will create)
 | File | Purpose |
 |------|---------|
-| `lib/services/twitch_api_service.dart` | GraphQL token fetching, API calls |
+| `lib/config/browser_constants.dart` | Centralized User-Agent string |
+| `lib/utils/app_logger.dart` | Structured logging with prefixes |
+| `lib/models/twitch_session.dart` | Integrity tokens + cookies model |
+| `lib/services/twitch_integrity_service.dart` | Ghost WebView harvester |
+| `lib/state/integrity_provider.dart` | Riverpod state for integrity |
+| `lib/services/behavioral_noise_service.dart` | Shadow nav + heartbeat |
+| `lib/widgets/captcha_modal.dart` | Blocking CAPTCHA dialog |
+| `lib/widgets/integrity_spinner.dart` | Loading + timeout UI |
+
+### Reference Files
+| File | Purpose |
+|------|---------|
 | `lib/services/twitch_auth_service.dart` | OAuth Device Code Grant flow |
 | `lib/services/settings_service.dart` | Persistent settings via shared_preferences |
 | `lib/services/low_latency_service.dart` | Buffer control, latency presets |
@@ -131,21 +196,48 @@ Finalizing player controls and adding DVR/rewind support.
 | `lib/services/preview_player_manager.dart` | Pre-initializes video controllers for hover preview |
 | `lib/state/multi_stream_notifier.dart` | Riverpod state for 4-slot multi-stream |
 | `lib/state/auth_provider.dart` | Riverpod state for authentication |
-| `lib/widgets/video_widget.dart` | Video player with TwitchPlayerController |
 | `lib/widgets/quality_selector.dart` | Quality dropdown from HLS manifest |
 | `lib/widgets/latency_slider.dart` | Latency control widgets |
 | `lib/utils/ui_config.dart` | Tunable UIUX constants (expose in Settings later) |
 
 ---
 
-## API Client IDs
+## API Configuration
 
-| Purpose | Client ID |
-|---------|-----------|
-| **OAuth (User Auth)** | `vrhsf9gxj2y4jntunres6mzber1fg1` |
-| Anonymous Tokens (Primary) | `kd1unb4b3q4t58fwlpcbzcbnm76a8fp` |
-| Anonymous Tokens (Fallback 1) | `ue666qo983tsx6so1t0vnawi233wa` |
-| Anonymous Tokens (Fallback 2) | `kimne78kx3ncx6brgo4mv6wki5h1ko` |
+### ⚠️ Phase 1.9 Migration: Static → Harvested
+
+**Before (Static - DEPRECATED):**
+```dart
+// OLD: lib/config/twitch_constants.dart
+const twitchGqlClientId = 'kd1unb4b3q4t58fwlpcbzcbnm76a8fp';
+headers['Client-ID'] = twitchGqlClientId;  // ❌ Will be blocked
+```
+
+**After (Harvested - Phase 1.9):**
+```dart
+// NEW: From TwitchIntegrityService
+final session = ref.read(integrityProvider).session;
+headers['Client-ID'] = session.clientId;           // ✅ Harvested
+headers['Client-Integrity'] = session.integrity;   // ✅ Required
+headers['X-Device-Id'] = session.deviceId;         // ✅ Required
+headers['Cookie'] = session.cookieHeader;          // ✅ Session sync
+```
+
+### Critical: User-Agent Fingerprint
+```dart
+// MUST be identical in both WebView AND fvp
+// lib/config/browser_constants.dart
+const twitchUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+```
+
+### Centralized Constants (Still Valid for OAuth)
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| **`twitchClientId`** | `vrhsf9gxj2y4jntunres6mzber1fg1` | OAuth Client ID - Device Code Grant |
+| `twitchGqlEndpoint` | `https://gql.twitch.tv/gql` | GraphQL endpoint |
+| `twitchHelixEndpoint` | `https://api.twitch.tv/helix` | Official Helix API |
+| `twitchOAuthScopes` | `[chat:read, chat:edit, ...]` | Required OAuth scopes |
 
 ---
 
@@ -158,6 +250,10 @@ Finalizing player controls and adding DVR/rewind support.
 3. **Simple Settings Storage:** Use `shared_preferences` with flat JSON. Per-channel quality stored as unlimited `Map<String, String>` - no eviction logic needed.
 
 4. **Auth Token Priority:** Once authenticated, use auth token for ALL calls. Anonymous only for logged-out users.
+
+5. **Structured Logging:** Use `AppLogger` with prefixes (`[Integrity]`, `[Noise]`, etc.). Never use `print()`.
+
+6. **Graceful Degradation:** 10s timeout on integrity harvest → show helpful error message about frontend obfuscation.
 
 ---
 

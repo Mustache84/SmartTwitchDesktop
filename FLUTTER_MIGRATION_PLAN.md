@@ -1,9 +1,10 @@
 # SmartTwitchTV → Flutter Migration Plan
 
-> **Status:** In Progress v1.5  
+> **Status:** In Progress v1.9  
 > **Date:** February 3, 2026  
-> **Last Updated:** February 4, 2026  
-> **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)
+> **Last Updated:** February 5, 2026  
+> **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)  
+> **Target Platforms:** macOS, Windows (Linux support removed)
 
 ---
 
@@ -80,11 +81,16 @@ OAuth is a prerequisite for player controls (subscription checks) and chat (auth
 
 **Auth Strategy:** Once authenticated, use auth token for ALL API calls. Anonymous flow only for logged-out users.
 
-**⚠️ TODO: Troubleshoot OAuth Client ID Issue**
-> The OAuth Client ID `vrhsf9gxj2y4jntunres6mzber1fg1` returns HTTP 400 "Client-ID header is invalid" when used for `PlaybackAccessToken` requests. Currently falling back to anonymous client IDs for stream tokens. Need to investigate:
-> - Is the Client ID registered correctly in Twitch Developer Console?
-> - Does PlaybackAccessToken require a different Client ID than user auth?
-> - Check if the Client ID was deleted/revoked
+**✅ OAuth Client ID Issue Resolved (February 4, 2026)**
+> Previous issue: Multiple conflicting client IDs hardcoded across files with unnecessary fallback arrays.
+>
+> **Root cause:** Twitch's unofficial GraphQL API (`gql.twitch.tv`) only accepts "blessed" client IDs from official Twitch clients. Custom OAuth client IDs return HTTP 400 on GraphQL endpoints.
+>
+> **Resolution:** Centralized all Twitch API constants in `lib/config/twitch_constants.dart` with two purpose-specific client IDs:
+> - `twitchClientId` (`vrhsf9gxj2y4jntunres6mzber1fg1`) - OAuth flows + Helix API
+> - `twitchGqlClientId` (`kd1unb4b3q4t58fwlpcbzcbnm76a8fp`) - GraphQL API only
+>
+> Removed all fallback arrays and rotation logic. Each service imports from the centralized constants file.
 
 ---
 
@@ -161,6 +167,91 @@ OAuth is a prerequisite for player controls (subscription checks) and chat (auth
 
 ---
 
+### 🔲 Phase 1.9: Headless Integrity & Noise Engine (PLANNED)
+
+> **Critical Pivot:** Twitch now requires `Client-Integrity` tokens for playback. Static client IDs are being blocked. This phase implements a "Ghost Browser" architecture to harvest valid integrity tokens from a hidden WebView.
+
+**Architecture Concept:**
+- **The Body (Foreground):** Flutter UI with `fvp` (MPV) for high-performance video
+- **The Ghost (Background):** Hidden 1x1 pixel `InAppWebView` running real Twitch site
+- **Goal:** Emulate legitimate web session for integrity tokens without triggering bot detection
+
+**Target Platforms:** macOS + Windows only. Linux support removed.
+
+| Step | Description | Files | Status |
+|------|-------------|-------|--------|
+| 1.9.1 | Add `flutter_inappwebview` dependency | `pubspec.yaml` | 🔲 |
+| 1.9.2 | Update macOS entitlements (JIT, audio-input) | `macos/Runner/*.entitlements` | 🔲 |
+| 1.9.3 | Delete Linux target folder | `linux/` | 🔲 |
+| 1.9.4 | Create `BrowserConstants` (centralized User-Agent) | `lib/config/browser_constants.dart` | 🔲 |
+| 1.9.5 | Create `AppLogger` utility (structured logging) | `lib/utils/app_logger.dart` | 🔲 |
+| 1.9.6 | Create `TwitchSession` model | `lib/models/twitch_session.dart` | 🔲 |
+| 1.9.7 | Create `TwitchIntegrityService` (Ghost WebView) | `lib/services/twitch_integrity_service.dart` | 🔲 |
+| 1.9.8 | Create `IntegrityProvider` (Riverpod state) | `lib/state/integrity_provider.dart` | 🔲 |
+| 1.9.9 | Create `BehavioralNoiseService` (heartbeat + shadow nav) | `lib/services/behavioral_noise_service.dart` | 🔲 |
+| 1.9.10 | Create `CaptchaModal` (blocking dialog) | `lib/widgets/captcha_modal.dart` | 🔲 |
+| 1.9.11 | Create `IntegritySpinner` (loading + timeout UI) | `lib/widgets/integrity_spinner.dart` | 🔲 |
+| 1.9.12 | Add `WidgetsBindingObserver` to app | `lib/main.dart` | 🔲 |
+| 1.9.13 | Refactor `TwitchApiService` for integrity headers | `lib/services/twitch_api_service.dart` | 🔲 |
+| 1.9.14 | Update `VideoWidget` with harvested identity | `lib/widgets/video_widget.dart` | 🔲 |
+| 1.9.15 | Replace all `print()` with `AppLogger` | All files | 🔲 |
+
+**TwitchIntegrityService Architecture:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Flutter App (MaterialApp)                                  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Stack                                                 │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │  Main UI (HomeScreen, PlayerScreen, etc.)       │  │  │
+│  │  └─────────────────────────────────────────────────┘  │  │
+│  │  ┌─────────────────────────────────────────────────┐  │  │
+│  │  │  Ghost WebView (1x1 pixel, behind UI)           │  │  │
+│  │  │  - Loads twitch.tv                              │  │  │
+│  │  │  - Intercepts GQL → extracts Client-Integrity   │  │  │
+│  │  │  - Blocks .ts/.m3u8/video-weaver URLs           │  │  │
+│  │  │  - Syncs cookies to fvp                         │  │  │
+│  │  └─────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Resource Blocking (Critical):**
+- Block URLs ending in `.ts`, `.m3u8`
+- Block URLs containing `video-weaver` (Twitch edge server)
+- Prevents Ghost from downloading 6Mbps stream in background
+
+**Behavioral Noise Strategy:**
+- **Shadow Navigation:** When user watches `shroud` → Ghost navigates to `twitch.tv/popout/shroud/chat`
+- **Heartbeat:** Random 3–7 min timer → inject `window.scrollBy(0, 10)` to prove "user presence"
+- **Muted Ads:** Let Ghost load ad metadata naturally (ultimate camouflage)
+
+**Error Handling:**
+- **10s Timeout:** Show spinner with message: *"Connection to Twitch is taking longer than expected. The frontend obfuscation may be broken—check for updates."*
+- **Captcha Detection:** If URL contains `checkpoint`/`captcha` → pause playback, show blocking modal
+- **403 Recovery:** Trigger `integrityService.reload()` → retry once
+
+**Lifecycle Management:**
+- `ref.onDispose` in Riverpod provider → dispose WebView controller
+- `WidgetsBindingObserver.didChangeAppLifecycleState(detached)` → force dispose on app quit
+- Prevents memory leaks from Chromium instances
+
+**User-Agent Fingerprint (Critical):**
+```dart
+// MUST be identical in both WebView AND fvp
+const twitchUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+```
+
+**Cookie Sync Format:**
+```dart
+// CookieManager → formatted header for fvp
+'Cookie: api_token=xxx; unique_id=yyy; server_session_id=zzz'
+// Note: Space after semicolon is required
+```
+
+---
+
 ### 🔲 Phase 2: Chat System
 - [ ] Wire up search functionality
 - [ ] Implement `TwitchIrcClient` with WebSocket (auth or anonymous)
@@ -178,13 +269,22 @@ OAuth is a prerequisite for player controls (subscription checks) and chat (auth
 |---------|-------|-------|
 | **OAuth Client ID** | `vrhsf9gxj2y4jntunres6mzber1fg1` | Device Code Grant flow, user authentication |
 | **OAuth Scopes** | `chat:read chat:edit user:read:follows user:read:subscriptions` | Chat, follows, DVR eligibility |
-| Primary Client ID | `kd1unb4b3q4t58fwlpcbzcbnm76a8fp` | Anonymous token fetching (fallback) |
-| Fallback Client IDs | `ue666qo983tsx6so1t0vnawi233wa`, `kimne78kx3ncx6brgo4mv6wki5h1ko` | Used if primary rate-limited |
+| Primary Client ID | `kd1unb4b3q4t58fwlpcbzcbnm76a8fp` | ~~Anonymous token fetching~~ **DEPRECATED Phase 1.9** |
+| Fallback Client IDs | ~~Various~~ | **REMOVED Phase 1.9** - Integrity harvester replaces static IDs |
 | GraphQL Endpoint | `https://gql.twitch.tv/gql` | All token/browse queries |
 | HLS Manifest | `https://usher.ttvnw.net/api/channel/hls/` | Stream URLs |
 | Device Code Endpoint | `https://id.twitch.tv/oauth2/device` | OAuth device code request |
 | Token Endpoint | `https://id.twitch.tv/oauth2/token` | OAuth token polling/refresh |
 | Validate Endpoint | `https://id.twitch.tv/oauth2/validate` | Token validation |
+
+### Integrity Headers (Phase 1.9 - Required)
+| Header | Source | Notes |
+|--------|--------|-------|
+| `Client-ID` | Harvested from WebView | Dynamically extracted from GQL requests |
+| `Client-Integrity` | Harvested from WebView | Cryptographic token required for playback |
+| `Authorization` | Harvested or OAuth | Bearer token for authenticated users |
+| `X-Device-Id` | Harvested from WebView | Device fingerprint |
+| `Cookie` | Harvested from WebView | `api_token`, `unique_id`, `server_session_id` |
 
 ### Architectural Patterns
 | Pattern | Implementation | Rationale |
@@ -192,6 +292,8 @@ OAuth is a prerequisite for player controls (subscription checks) and chat (auth
 | Video Controller Persistence | `VideoControllerManager` singleton | Prevents stream reload during drag-drop reordering |
 | State Management | `flutter_riverpod` | Clean separation, testable, supports complex multi-stream state |
 | UIUX Configurability | `ui_config.dart` constants | All timing/animation values tunable; expose in Settings later |
+| **Ghost Browser** | `TwitchIntegrityService` + 1x1 WebView | Harvest integrity tokens without user visibility |
+| **Behavioral Mimicry** | `BehavioralNoiseService` | Shadow nav + heartbeat to avoid bot detection |
 
 ### UIUX Directive
 > **All UIUX-related decisions should be user-configurable where sensible.** When adding new UIUX features, evaluate whether the setting should be exposed in the Settings screen for user customization.
@@ -200,7 +302,10 @@ OAuth is a prerequisite for player controls (subscription checks) and chat (auth
 
 ## TODOs & Future Work
 
-### Phase 1.5-1.8: OAuth + Player Controls (Current Priority)
+### Phase 1.9: Headless Integrity Engine (Current Priority)
+See detailed task list in Progress Log above. This is a **blocking prerequisite** for continued playback functionality.
+
+### Phase 1.5-1.8: OAuth + Player Controls
 See detailed task lists in Progress Log above.
 
 ### Phase 2: Chat System
@@ -248,6 +353,7 @@ This document outlines the complete migration of SmartTwitchTV from a Tauri/WebV
 | Live IRC Chat with Overlay | P0 | 🔲 Phase 2 |
 | BTTV/FFZ/7TV Emote Support | P1 | 🔲 Phase 2 |
 | DVR/Rewind (Subscribers) | P1 | 🔲 Phase 1.8 |
+| **Twitch Integrity Engine** | P0 | 🔲 Phase 1.9 |
 | Personalized Home (Follows) | P1 | 🔲 Phase 3 |
 | Picture-in-Picture Mode | P2 | 🔲 Backlog |
 | 50/50 Split View | P2 | 🔲 Backlog |
@@ -257,7 +363,7 @@ This document outlines the complete migration of SmartTwitchTV from a Tauri/WebV
 
 ## 1. Stack & Dependencies
 
-### Core Framework
+### Core Framework (Updated February 5, 2026)
 ```yaml
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -265,8 +371,11 @@ environment:
 
 dependencies:
   # Video Engine (MDK-based)
-  fvp: ^0.20.0
-  video_player: ^2.8.0
+  fvp: ^0.35.2
+  video_player: ^2.9.0
+  
+  # Headless Browser (Phase 1.9)
+  flutter_inappwebview: ^6.1.0  # NEW - Integrity token harvesting
   
   # State Management
   flutter_riverpod: ^2.4.0
