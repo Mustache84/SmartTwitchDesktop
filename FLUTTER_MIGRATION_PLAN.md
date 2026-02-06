@@ -1,9 +1,9 @@
 # SmartTwitchTV → Flutter Migration Plan
 
-> **Status:** In Progress v1.9  
+> **Status:** Phase 1.9 Complete  
 > **Date:** February 3, 2026  
 > **Last Updated:** February 5, 2026  
-> **Latest Change:** Service Lifecycle & Dependency Injection (Phase 1.5.1)  
+> **Latest Change:** Phase 1.9 Headless Integrity Engine Complete  
 > **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)  
 > **Target Platforms:** macOS, Windows (Linux support removed)
 
@@ -213,87 +213,70 @@ class _SmartTwitchAppState extends State<SmartTwitchApp> with WindowListener {
 
 ---
 
-### 🔲 Phase 1.9: Headless Integrity & Noise Engine (PLANNED)
+### ✅ Phase 1.9: Headless Integrity & Noise Engine (COMPLETE)
 
-> **Critical Pivot:** Twitch now requires `Client-Integrity` tokens for playback. Static client IDs are being blocked. This phase implements a "Ghost Browser" architecture to harvest valid integrity tokens from a hidden WebView.
+> **Critical Pivot:** We have successfully implemented a "Ghost Browser" architecture to bypass Twitch's API hardening. Instead of static Client IDs (which return 403 Forbidden), a hidden WebView runs the real Twitch website to harvest valid `Client-Integrity` tokens and session cookies.
 
-**Architecture Concept:**
-- **The Body (Foreground):** Flutter UI with `fvp` (MPV) for high-performance video
-- **The Ghost (Background):** Hidden 1x1 pixel `InAppWebView` running real Twitch site
-- **Goal:** Emulate legitimate web session for integrity tokens without triggering bot detection
+**Architecture:**
+
+* **The Body:** Flutter UI + `fvp` (MPV) for video playback.
+* **The Ghost:** Hidden `HeadlessInAppWebView` running `twitch.tv`.
+* **The Noise:** `BehavioralNoiseService` that mimics human navigation (shadowing) to prevent bot detection.
 
 **Target Platforms:** macOS + Windows only. Linux support removed.
 
 | Step | Description | Files | Status |
 |------|-------------|-------|--------|
-| 1.9.1 | Add `flutter_inappwebview` dependency | `pubspec.yaml` | 🔲 |
-| 1.9.2 | Update macOS entitlements (JIT, audio-input) | `macos/Runner/*.entitlements` | 🔲 |
-| 1.9.3 | Delete Linux target folder | `linux/` | 🔲 |
-| 1.9.4 | Create `BrowserConstants` (centralized User-Agent) | `lib/config/browser_constants.dart` | 🔲 |
-| 1.9.5 | Create `AppLogger` utility (structured logging) | `lib/utils/app_logger.dart` | 🔲 |
-| 1.9.6 | Create `TwitchSession` model | `lib/models/twitch_session.dart` | 🔲 |
-| 1.9.7 | Create `TwitchIntegrityService` (Ghost WebView) | `lib/services/twitch_integrity_service.dart` | 🔲 |
-| 1.9.8 | Create `IntegrityProvider` (Riverpod state) | `lib/state/integrity_provider.dart` | 🔲 |
-| 1.9.9 | Create `BehavioralNoiseService` (heartbeat + shadow nav) | `lib/services/behavioral_noise_service.dart` | 🔲 |
-| 1.9.10 | Create `CaptchaModal` (blocking dialog) | `lib/widgets/captcha_modal.dart` | 🔲 |
-| 1.9.11 | Create `IntegritySpinner` (loading + timeout UI) | `lib/widgets/integrity_spinner.dart` | 🔲 |
-| 1.9.12 | Add `WidgetsBindingObserver` to app | `lib/main.dart` | 🔲 |
-| 1.9.13 | Refactor `TwitchApiService` for integrity headers | `lib/services/twitch_api_service.dart` | 🔲 |
-| 1.9.14 | Update `VideoWidget` with harvested identity | `lib/widgets/video_widget.dart` | 🔲 |
-| 1.9.15 | Replace all `print()` with `AppLogger` | All files | 🔲 |
+| **1.9.1** | **Infrastructure Setup** | | |
+| 1.9.1.1 | Add `flutter_inappwebview` & `url_launcher` | `pubspec.yaml` | ✅ |
+| 1.9.1.2 | Create `BrowserConstants` (Golden User-Agent) | `lib/utils/browser_constants.dart` | ✅ |
+| 1.9.1.3 | macOS Entitlements (`network.client`, `audio-input`) | `macos/Runner/*.entitlements` | ✅ |
+| **1.9.2** | **The Harvester (Ghost Browser)** | | |
+| 1.9.2.1 | `TwitchIntegrityService` (Headless WebView) | `lib/services/twitch_integrity_service.dart` | ✅ |
+| 1.9.2.2 | Resource Blocking (Block `.ts`/`.m3u8` to save bandwidth) | `twitch_integrity_service.dart` | ✅ |
+| 1.9.2.3 | Token Extraction (`Client-Integrity`, `Authorization`) | `twitch_integrity_service.dart` | ✅ |
+| 1.9.2.4 | Cookie Sync (Sync `api_token` to `TwitchSession`) | `lib/models/twitch_session.dart` | ✅ |
+| **1.9.3** | **Behavioral Noise (Anti-Bot)** | | |
+| 1.9.3.1 | `BehavioralNoiseService` (Shadow Navigation + Heartbeat) | `lib/services/behavioral_noise_service.dart` | ✅ |
+| 1.9.3.2 | "Popout Context" logic (Nav to lightweight chat URL) | `behavioral_noise_service.dart` | ✅ |
+| 1.9.3.3 | Wire `main.dart` with `IntegrityInitializer` | `lib/main.dart` | ✅ |
+| **1.9.4** | **Observability (Trust but Verify)** | | |
+| 1.9.4.1 | `IntegrityStatusIndicator` widget (Sidebar Dot) | `lib/widgets/debug/integrity_status_indicator.dart` | ✅ |
+| 1.9.4.2 | Enhanced Logging (Emoji-based status logs) | `twitch_api_service.dart` | ✅ |
+| 1.9.4.3 | Sidebar Integration (Debug Mode visibility) | `lib/widgets/collapsible_sidebar.dart` | ✅ |
+| **1.9.5** | **The Wiring (Final Integration)** | | |
+| 1.9.5.1 | Update `TwitchApiService` to use `TwitchSession` headers | `lib/services/twitch_api_service.dart` | ✅ |
+| 1.9.5.2 | Update `VideoWidget` to accept `integritySession` | `lib/widgets/video_widget.dart` | ✅ |
+| 1.9.5.3 | Pass Session to `PlayerScreen` & `MultiStreamGrid` | `lib/screens/player_screen.dart`, `video_controller_manager.dart` | ✅ |
+| 1.9.5.4 | Pass Session to `PreviewPlayerManager` | `lib/services/preview_player_manager.dart` | ✅ |
+| 1.9.5.5 | Fix `Disposable` ambiguous import | `lib/core/di/service_locator.dart` | ✅ |
 
-**TwitchIntegrityService Architecture:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Flutter App (MaterialApp)                                  │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  Stack                                                 │  │
-│  │  ┌─────────────────────────────────────────────────┐  │  │
-│  │  │  Main UI (HomeScreen, PlayerScreen, etc.)       │  │  │
-│  │  └─────────────────────────────────────────────────┘  │  │
-│  │  ┌─────────────────────────────────────────────────┐  │  │
-│  │  │  Ghost WebView (1x1 pixel, behind UI)           │  │  │
-│  │  │  - Loads twitch.tv                              │  │  │
-│  │  │  - Intercepts GQL → extracts Client-Integrity   │  │  │
-│  │  │  - Blocks .ts/.m3u8/video-weaver URLs           │  │  │
-│  │  │  - Syncs cookies to fvp                         │  │  │
-│  │  └─────────────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+**Implementation Details:**
 
-**Resource Blocking (Critical):**
-- Block URLs ending in `.ts`, `.m3u8`
-- Block URLs containing `video-weaver` (Twitch edge server)
-- Prevents Ghost from downloading 6Mbps stream in background
-
-**Behavioral Noise Strategy:**
-- **Shadow Navigation:** When user watches `shroud` → Ghost navigates to `twitch.tv/popout/shroud/chat`
-- **Heartbeat:** Random 3–7 min timer → inject `window.scrollBy(0, 10)` to prove "user presence"
-- **Muted Ads:** Let Ghost load ad metadata naturally (ultimate camouflage)
-
-**Error Handling:**
-- **10s Timeout:** Show spinner with message: *"Connection to Twitch is taking longer than expected. The frontend obfuscation may be broken—check for updates."*
-- **Captcha Detection:** If URL contains `checkpoint`/`captcha` → pause playback, show blocking modal
-- **403 Recovery:** Trigger `integrityService.reload()` → retry once
-
-**Lifecycle Management:**
-- `ref.onDispose` in Riverpod provider → dispose WebView controller
-- `WidgetsBindingObserver.didChangeAppLifecycleState(detached)` → force dispose on app quit
-- Prevents memory leaks from Chromium instances
+* **Resource Blocking:** The Ghost Browser returns `404` for any URL ending in `.ts` or containing `video-weaver`. This prevents the app from downloading the stream twice (once in background, once in player).
+* **Shadow Navigation:** When the user watches "shroud" in the UI, the Ghost Browser quietly navigates to `twitch.tv/popout/shroud/chat` to establish channel context without loading the heavy video player.
+* **Heartbeat:** Every 3-7 minutes, the Ghost executes a harmless JS action (`window.scrollBy`) to prove "user presence" to Twitch's bot detection.
 
 **User-Agent Fingerprint (Critical):**
 ```dart
 // MUST be identical in both WebView AND fvp
-const twitchUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+const kBrowserUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 ```
 
-**Cookie Sync Format:**
-```dart
-// CookieManager → formatted header for fvp
-'Cookie: api_token=xxx; unique_id=yyy; server_session_id=zzz'
-// Note: Space after semicolon is required
+**Header Injection Flow:**
+```
+IntegrityInitializer → TwitchIntegrityService (harvests tokens)
+         ↓
+integritySessionProvider (Riverpod state)
+         ↓
+    ┌────┴────┐
+    ↓         ↓
+PlayerScreen  HomeScreen
+    ↓              ↓
+VideoWidget   PreviewPlayerManager
+    ↓              ↓
+VideoPlayerController (with Client-ID, Client-Integrity, X-Device-Id, Cookie headers)
 ```
 
 ---
