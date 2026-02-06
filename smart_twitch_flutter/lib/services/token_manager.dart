@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:smart_twitch_flutter/core/interfaces/disposable.dart';
 import 'package:smart_twitch_flutter/services/secure_token_storage.dart';
 import 'package:smart_twitch_flutter/services/twitch_auth_service.dart';
 
@@ -9,7 +10,9 @@ import 'package:smart_twitch_flutter/services/twitch_auth_service.dart';
 /// - Loading tokens from secure storage
 /// - Automatic refresh before expiration
 /// - Providing valid tokens to other services
-class TokenManager {
+///
+/// Implements [Disposable] for graceful shutdown on window close.
+class TokenManager implements Disposable {
   static final TokenManager _instance = TokenManager._internal();
   factory TokenManager() => _instance;
   TokenManager._internal();
@@ -173,8 +176,12 @@ class TokenManager {
     await clearTokens();
   }
 
-  /// Dispose the token manager
-  void dispose() {
+  /// Dispose the token manager, cancelling any pending refresh timers.
+  @override
+  Future<void> dispose() async {
     _refreshTimer?.cancel();
+    _refreshTimer = null;
+    _cachedAccessToken = null;
+    _isInitialized = false;
   }
 }

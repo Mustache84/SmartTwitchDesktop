@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:smart_twitch_flutter/core/interfaces/disposable.dart';
 import 'settings_service.dart';
 
 /// Service for managing low-latency playback.
 ///
 /// Uses MDK's buffer control and playback rate adjustment for catch-up.
 /// Target latency is configurable from 0.5s to 10s.
-class LowLatencyService {
+///
+/// Implements [Disposable] for graceful shutdown on window close.
+class LowLatencyService implements Disposable {
   LowLatencyService._();
   static final instance = LowLatencyService._();
 
@@ -105,8 +108,9 @@ class LowLatencyService {
         LatencyPreset(10.0, 'Maximum', 'Best stability, most delay'),
       ];
 
-  /// Dispose resources
-  void dispose() {
+  /// Dispose resources, cancelling any catch-up timers.
+  @override
+  Future<void> dispose() async {
     _catchUpTimer?.cancel();
     _catchUpTimer = null;
   }

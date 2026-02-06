@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:smart_twitch_flutter/core/interfaces/disposable.dart';
 import '../models/stream_preview.dart';
 import '../utils/hls_url_builder.dart';
 import 'twitch_api_service.dart';
@@ -26,7 +27,9 @@ class PreloadedController {
 /// 2. On hover: just calls play() - INSTANT playback!
 /// 3. Token caching for refresh scenarios
 /// 4. Single controller plays at a time (others paused)
-class PreviewPlayerManager extends ChangeNotifier {
+///
+/// Implements [Disposable] for graceful shutdown on window close.
+class PreviewPlayerManager extends ChangeNotifier implements Disposable {
   static final PreviewPlayerManager _instance = PreviewPlayerManager._internal();
   factory PreviewPlayerManager() => _instance;
   PreviewPlayerManager._internal() {
@@ -276,11 +279,19 @@ class PreviewPlayerManager extends ChangeNotifier {
     _currentChannel = null;
   }
   
-  /// Public dispose method
+  /// Public dispose method for manual cleanup.
   void disposePlayer() {
     print('[PreviewManager] Disposing all preview controllers');
     _disposeAllControllers();
     notifyListeners();
+  }
+
+  /// Dispose all resources for graceful shutdown.
+  @override
+  Future<void> dispose() async {
+    print('[PreviewManager] Disposing for shutdown');
+    await _disposeAllControllers();
+    super.dispose();
   }
   
   /// Refresh a specific channel's controller

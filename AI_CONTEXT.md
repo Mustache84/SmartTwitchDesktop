@@ -7,6 +7,39 @@
 
 ---
 
+## ✅ NEW: Service Lifecycle & Dependency Injection (Phase 1.5.1)
+
+Implemented proper desktop app architecture for graceful shutdown and resource management.
+
+### Key Components
+| Component | File | Purpose |
+|-----------|------|--------|
+| `Disposable` | `lib/core/interfaces/disposable.dart` | Interface for services needing cleanup |
+| `ServiceLocator` | `lib/core/di/service_locator.dart` | GetIt-based DI with shutdown logic |
+| `WindowListener` | `lib/main.dart` | Graceful shutdown on window close |
+
+### Usage Pattern
+```dart
+// Access any service:
+final authService = sl<TwitchAuthService>();
+final tokenManager = sl<TokenManager>();
+
+// Window close triggers automatic cleanup:
+// main.dart → onWindowClose() → ServiceLocator.disposeAll()
+```
+
+### Registered Services
+- `SettingsService` - Persistent settings
+- `TwitchAuthService` - OAuth Device Code Grant
+- `TokenManager` - Token refresh (implements `Disposable`)
+- `TwitchApiService` - GraphQL API
+- `TwitchBrowseService` - Browse data
+- `HlsManifestService` - Quality parsing
+- `LowLatencyService` - Latency control (implements `Disposable`)
+- `PreviewPlayerManager` - Video controllers (implements `Disposable`)
+
+---
+
 ## ⚠️ CRITICAL: Phase 1.9 Architecture Pivot
 
 Twitch now requires `Client-Integrity` tokens for playback. Static client IDs are being blocked. Phase 1.9 implements a "Ghost Browser" to harvest valid integrity tokens.
@@ -27,6 +60,7 @@ Twitch now requires `Client-Integrity` tokens for playback. Static client IDs ar
 | Framework | Flutter 3.38.9 (desktop) |
 | Video Engine | `fvp` v0.35.2 (MDK-based, hardware-accelerated) |
 | State Management | `flutter_riverpod` v3.1.0 (Notifier pattern) |
+| Dependency Injection | `get_it` v8.0.3 (lazy singletons) |
 | HTTP | `dio` v5.7.0 |
 | **Headless Browser** | `flutter_inappwebview` v6.1.0 (Phase 1.9) |
 | Twitch API | GraphQL via `gql.twitch.tv/gql` |
@@ -38,6 +72,9 @@ SmartTwitchDesktop/
 │   ├── lib/
 │   │   ├── main.dart
 │   │   ├── config/           # Constants (twitch_constants, browser_constants)
+│   │   ├── core/             # Core architecture
+│   │   │   ├── di/           # Dependency injection (service_locator.dart)
+│   │   │   └── interfaces/   # Contracts (disposable.dart)
 │   │   ├── models/           # Data models (TwitchSession)
 │   │   ├── screens/          # Full-page screens
 │   │   ├── services/         # API, video, auth, integrity services
@@ -97,6 +134,13 @@ SmartTwitchDesktop/
 - `TwitchPlayerController` wrapper for runtime player control
 - **Working keyboard shortcuts:** Space (play/pause), M (mute), L (low latency), H (hide UI), ↑↓ (volume)
 - Player controls overlay with play/pause, mute, volume slider
+
+### ✅ Service Lifecycle & Dependency Injection (Phase 1.5.1)
+- `Disposable` interface for services with cleanup needs
+- `ServiceLocator` (GetIt) for lazy singleton registration
+- `WindowListener` integration for graceful app shutdown
+- Services implement `Disposable`: `TokenManager`, `LowLatencyService`, `PreviewPlayerManager`
+- Automatic disposal on window close (timers, controllers, connections)
 
 ---
 

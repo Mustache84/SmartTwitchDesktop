@@ -27,6 +27,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.8] - 2026-02-05
+
+### Added
+- **Phase 1.5.1: Service Lifecycle & Dependency Injection**
+  - `Disposable` interface for services requiring cleanup (`lib/core/interfaces/disposable.dart`)
+  - `ServiceLocator` class with GetIt-based lazy singleton registration (`lib/core/di/service_locator.dart`)
+  - `WindowListener` implementation in `main.dart` for graceful shutdown
+  - Automatic `disposeAll()` on window close (prevents memory leaks on long-running desktop sessions)
+  - Added `get_it: ^8.0.3` dependency
+
+### Changed
+- `SmartTwitchApp` is now a `StatefulWidget` with `WindowListener` mixin
+- `TokenManager` now implements `Disposable` (cancels refresh timer)
+- `LowLatencyService` now implements `Disposable` (cancels catch-up timer)
+- `PreviewPlayerManager` now implements `Disposable` (disposes video controllers)
+- `SettingsService` initialization moved into `ServiceLocator.initialize()`
+- All services registered as lazy singletons via `sl<ServiceType>()`
+
+### Architecture
+```dart
+// Access any service:
+final tokenManager = sl<TokenManager>();
+
+// Graceful shutdown:
+onWindowClose() → ServiceLocator.disposeAll() → windowManager.destroy()
+```
+
+---
+
 ## [0.1.7] - 2026-02-04
 
 ### Added

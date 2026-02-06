@@ -3,6 +3,7 @@
 > **Status:** In Progress v1.9  
 > **Date:** February 3, 2026  
 > **Last Updated:** February 5, 2026  
+> **Latest Change:** Service Lifecycle & Dependency Injection (Phase 1.5.1)  
 > **Replaces:** `DESKTOP_FORK_PLAN.md` (Tauri/Rust approach - ABANDONED)  
 > **Target Platforms:** macOS, Windows (Linux support removed)
 
@@ -91,6 +92,51 @@ OAuth is a prerequisite for player controls (subscription checks) and chat (auth
 > - `twitchGqlClientId` (`kd1unb4b3q4t58fwlpcbzcbnm76a8fp`) - GraphQL API only
 >
 > Removed all fallback arrays and rotation logic. Each service imports from the centralized constants file.
+
+---
+
+### ✅ Phase 1.5.1: Service Lifecycle & Dependency Injection (COMPLETE)
+
+Desktop apps run for hours/days. Proper service lifecycle management prevents memory leaks and ensures graceful shutdown.
+
+| Step | Description | Files | Status |
+|------|-------------|-------|---------|
+| 1.5.1.1 | Add `get_it` dependency | `pubspec.yaml` | ✅ |
+| 1.5.1.2 | Create `Disposable` interface | `lib/core/interfaces/disposable.dart` | ✅ |
+| 1.5.1.3 | Create `ServiceLocator` with shutdown logic | `lib/core/di/service_locator.dart` | ✅ |
+| 1.5.1.4 | Implement `WindowListener` in main.dart | `lib/main.dart` | ✅ |
+| 1.5.1.5 | Refactor `TokenManager` to implement `Disposable` | `lib/services/token_manager.dart` | ✅ |
+| 1.5.1.6 | Refactor `LowLatencyService` to implement `Disposable` | `lib/services/low_latency_service.dart` | ✅ |
+| 1.5.1.7 | Refactor `PreviewPlayerManager` to implement `Disposable` | `lib/services/preview_player_manager.dart` | ✅ |
+| 1.5.1.8 | Register all services as lazy singletons | `lib/core/di/service_locator.dart` | ✅ |
+
+**Architecture:**
+```dart
+// Global GetIt instance
+final GetIt sl = GetIt.instance;
+
+// Access services anywhere:
+final tokenManager = sl<TokenManager>();
+
+// Graceful shutdown on window close:
+class _SmartTwitchAppState extends State<SmartTwitchApp> with WindowListener {
+  @override
+  Future<void> onWindowClose() async {
+    await ServiceLocator.disposeAll();  // Dispose all Disposable services
+    await windowManager.destroy();
+  }
+}
+```
+
+**Registered Services:**
+- `SettingsService` (core)
+- `TwitchAuthService` (auth)
+- `TokenManager` (auth, implements `Disposable`)
+- `TwitchApiService` (API)
+- `TwitchBrowseService` (API)
+- `HlsManifestService` (API)
+- `LowLatencyService` (player, implements `Disposable`)
+- `PreviewPlayerManager` (player, implements `Disposable`)
 
 ---
 
