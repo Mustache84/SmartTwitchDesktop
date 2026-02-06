@@ -1,7 +1,7 @@
 # AI Agent Context File
 
 > **Last Updated:** February 5, 2026  
-> **Current Phase:** 1.9 (Headless Integrity & Noise Engine) - **BLOCKING PRIORITY**  
+> **Current Phase:** 1.9d (Player Wiring & Cleanup) - **COMPLETE**  
 > **Target Platforms:** macOS, Windows (Linux removed)  
 > **For detailed task breakdown, see:** `FLUTTER_MIGRATION_PLAN.md`
 
@@ -171,21 +171,23 @@ SmartTwitchDesktop/
 ### Phase 1.9 Task List
 | # | Task | File | Status |
 |---|------|------|--------|
-| 1 | Add `flutter_inappwebview` dependency | `pubspec.yaml` | 🔲 |
-| 2 | Update macOS entitlements (JIT, audio-input) | `macos/Runner/*.entitlements` | 🔲 |
-| 3 | Delete Linux target folder | `linux/` | 🔲 |
-| 4 | Create `BrowserConstants` (User-Agent) | `lib/config/browser_constants.dart` | 🔲 |
-| 5 | Create `AppLogger` utility | `lib/utils/app_logger.dart` | 🔲 |
-| 6 | Create `TwitchSession` model | `lib/models/twitch_session.dart` | 🔲 |
-| 7 | Create `TwitchIntegrityService` | `lib/services/twitch_integrity_service.dart` | 🔲 |
-| 8 | Create `IntegrityProvider` | `lib/state/integrity_provider.dart` | 🔲 |
-| 9 | Create `BehavioralNoiseService` | `lib/services/behavioral_noise_service.dart` | 🔲 |
-| 10 | Create `CaptchaModal` | `lib/widgets/captcha_modal.dart` | 🔲 |
-| 11 | Create `IntegritySpinner` | `lib/widgets/integrity_spinner.dart` | 🔲 |
-| 12 | Add `WidgetsBindingObserver` | `lib/main.dart` | 🔲 |
-| 13 | Refactor `TwitchApiService` | `lib/services/twitch_api_service.dart` | 🔲 |
-| 14 | Update `VideoWidget` | `lib/widgets/video_widget.dart` | 🔲 |
-| 15 | Replace all `print()` | All files | 🔲 |
+| 1 | Add `flutter_inappwebview` dependency | `pubspec.yaml` | ✅ |
+| 2 | Update macOS entitlements (JIT, audio-input) | `macos/Runner/*.entitlements` | ✅ |
+| 3 | Delete Linux target folder | `linux/` | 🔲 (deferred) |
+| 4 | Create `BrowserConstants` (User-Agent) | `lib/utils/browser_constants.dart` | ✅ |
+| 5 | Create `TwitchSession` model | `lib/models/twitch_session.dart` | ✅ |
+| 6 | Create `TwitchIntegrityService` | `lib/services/twitch_integrity_service.dart` | ✅ |
+| 7 | Create `IntegrityProvider` | `lib/state/integrity_provider.dart` | ✅ |
+| 8 | Create `BehavioralNoiseService` | `lib/services/behavioral_noise_service.dart` | ✅ |
+| 9 | Create `IntegrityWebViewFallback` | `lib/widgets/integrity_webview_fallback.dart` | ✅ |
+| 10 | Create `IntegrityStatusIndicator` | `lib/widgets/debug/integrity_status_indicator.dart` | ✅ |
+| 11 | Refactor `TwitchApiService` | `lib/services/twitch_api_service.dart` | ✅ |
+| 12 | Update `VideoWidget` | `lib/widgets/video_widget.dart` | ✅ |
+| 13 | Update `VideoControllerManager` | `lib/widgets/video_controller_manager.dart` | ✅ |
+| 14 | Update `PreviewPlayerManager` | `lib/services/preview_player_manager.dart` | ✅ |
+| 15 | Update `PlayerScreen` | `lib/screens/player_screen.dart` | ✅ |
+| 16 | Update `HomeScreen` | `lib/screens/home_screen.dart` | ✅ |
+| 17 | Fix `Disposable` ambiguous import | `lib/core/di/service_locator.dart` | ✅ |
 
 ---
 

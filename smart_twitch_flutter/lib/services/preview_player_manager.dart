@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fvp/fvp.dart' as fvp;
 import 'package:smart_twitch_flutter/core/interfaces/disposable.dart';
-import '../models/stream_preview.dart';
-import '../utils/hls_url_builder.dart';
-import 'twitch_api_service.dart';
+import 'package:smart_twitch_flutter/models/stream_preview.dart';
+import 'package:smart_twitch_flutter/models/twitch_session.dart';
+import 'package:smart_twitch_flutter/utils/browser_constants.dart';
+import 'package:smart_twitch_flutter/utils/hls_url_builder.dart';
+import 'package:smart_twitch_flutter/services/twitch_api_service.dart';
 
 /// Pre-initialized video controller for instant playback
 class PreloadedController {
@@ -51,6 +53,9 @@ class PreviewPlayerManager extends ChangeNotifier implements Disposable {
   
   // Pending play: channel that should auto-play when its controller becomes ready
   String? _pendingPlay;
+  
+  // Integrity session for authenticated playback
+  TwitchSession? _session;
 
   // Getters
   String? get currentChannel => _currentChannel;
@@ -62,8 +67,19 @@ class PreviewPlayerManager extends ChangeNotifier implements Disposable {
   
   /// Pre-initialize controllers for ALL streams
   /// Called when streams are loaded - makes previews instant!
-  Future<void> preloadAllStreams(List<StreamPreview> streams) async {
+  /// 
+  /// If [session] is provided, all controllers will use integrity headers.
+  Future<void> preloadAllStreams(
+    List<StreamPreview> streams, {
+    TwitchSession? session,
+  }) async {
     print('[PreviewManager] Pre-loading ${streams.length} streams...');
+    
+    // Store session for use in controller initialization
+    _session = session;
+    if (session != null) {
+      print('[PreviewManager] 🔐 Using integrity session for previews');
+    }
     
     // Dispose any old controllers first
     await _disposeAllControllers();
@@ -120,11 +136,29 @@ class PreviewPlayerManager extends ChangeNotifier implements Disposable {
       
       print('[PreviewManager] Initializing controller for $channelLogin');
       
+      // Build HTTP headers - MUST match the harvester User-Agent exactly
+      final headers = <String, String>{
+        'User-Agent': kBrowserUserAgent,
+      };
+      
+      // Add integrity headers if session is available
+      if (_session != null) {
+        headers['Client-ID'] = _session!.clientId;
+        headers['Client-Integrity'] = _session!.integrityToken;
+        headers['X-Device-Id'] = _session!.deviceId;
+        
+        if (_session!.authorization != null) {
+          headers['Authorization'] = _session!.authorization!;
+        }
+        
+        if (_session!.cookieString.isNotEmpty) {
+          headers['Cookie'] = _session!.cookieString;
+        }
+      }
+      
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(hlsUrl),
-        httpHeaders: const {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        },
+        httpHeaders: headers,
       );
       
       await controller.initialize();

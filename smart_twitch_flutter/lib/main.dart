@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:fvp/fvp.dart' as fvp;
 import 'package:smart_twitch_flutter/core/di/service_locator.dart';
+import 'package:smart_twitch_flutter/widgets/integrity_webview_fallback.dart';
+import 'package:smart_twitch_flutter/services/behavioral_noise_service.dart';
 import 'core/core.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -37,7 +39,13 @@ void main() async {
     await windowManager.focus();
   });
   
-  runApp(const ProviderScope(child: SmartTwitchApp()));
+  runApp(
+    const ProviderScope(
+      child: IntegrityInitializer(
+        child: SmartTwitchApp(),
+      ),
+    ),
+  );
 }
 
 /// Root application widget with window lifecycle management.
@@ -79,6 +87,10 @@ class _SmartTwitchAppState extends State<SmartTwitchApp> with WindowListener {
     return Consumer(
       builder: (context, ref, child) {
         final authState = ref.watch(authProvider);
+        
+        // Initialize behavioral noise service (will auto-start)
+        // This creates the subscription to stream state changes
+        ref.watch(behavioralNoiseServiceProvider);
         
         return MaterialApp(
           title: AppStrings.appName,

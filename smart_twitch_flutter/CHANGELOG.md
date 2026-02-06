@@ -6,24 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Unreleased] - Phase 1.9: Headless Integrity Engine
+## [0.1.9] - 2026-02-05
 
-### Planned
-- **Headless WebView Integration** - Hidden 1x1 pixel browser harvests Twitch integrity tokens
-- **TwitchIntegrityService** - Intercepts GQL requests, extracts `Client-Integrity` headers
-- **BehavioralNoiseService** - Shadow navigation + heartbeat to avoid bot detection
-- **CaptchaModal** - Blocking dialog when Twitch requires human verification
-- **IntegritySpinner** - Loading state with timeout warning for frontend obfuscation issues
-- **AppLogger** - Structured logging with `[Integrity]`, `[Noise]`, `[Captcha]` prefixes
-- **BrowserConstants** - Centralized Chrome 122 User-Agent string
+### Added
+- **Phase 1.9: Headless Integrity Engine (Complete)**
+  - `flutter_inappwebview: ^6.1.5` dependency for hidden browser token harvesting
+  - `TwitchIntegrityService` - Headless WebView that loads Twitch and intercepts GQL headers
+  - `TwitchSession` model - Holds Client-ID, Client-Integrity, Device-ID, Authorization, cookies
+  - `BrowserConstants` - Centralized Chrome 122 User-Agent (`lib/utils/browser_constants.dart`)
+  - `IntegrityProvider` - Riverpod state management for integrity tokens
+  - `BehavioralNoiseService` - Shadow navigation + randomized heartbeat (3-7 min intervals)
+  - `IntegrityWebViewFallback` - 1x1 pixel visible WebView for Windows fallback
+  - `IntegrityStatusIndicator` - Debug UI showing 🔴🟡🟢 status with click-to-refresh
+
+### Changed
+- **TwitchApiService** - Now injects integrity headers from `TwitchIntegrityService`
+  - Automatic retry on 403 with token refresh
+  - Enhanced logging with emojis (`[API] 🔐`, `[API] ⚠️`, `[API] ✅`)
+- **VideoWidget** - Accepts optional `integritySession` parameter for header injection
+- **VideoControllerManager** - `getController()` accepts optional `TwitchSession` for headers
+- **PersistentVideoWidget** - Watches `integritySessionProvider` for multi-stream players
+- **PreviewPlayerManager** - `preloadAllStreams()` accepts optional `TwitchSession` for previews
+- **PlayerScreen** - Passes `integritySession` to `TwitchVideoWidget`
+- **HomeScreen** - Passes `integritySession` to `PreviewPlayerManager.preloadAllStreams()`
+- **main.dart** - Wrapped app with `IntegrityInitializer`, watches `behavioralNoiseServiceProvider`
+- **CollapsibleSidebar** - Added `IntegrityStatusIndicator` widget
+- **service_locator.dart** - Fixed `Disposable` ambiguous import (hide from get_it)
+- macOS entitlements updated with `com.apple.security.device.audio-input` and `com.apple.security.cs.allow-jit`
+
+### Architecture
+```
+IntegrityInitializer → TwitchIntegrityService (harvests tokens)
+         ↓
+integritySessionProvider (Riverpod state)
+         ↓
+    ┌────┴────┐
+    ↓         ↓
+PlayerScreen  HomeScreen
+    ↓              ↓
+VideoWidget   PreviewPlayerManager
+    ↓              ↓
+VideoPlayerController (with Client-ID, Client-Integrity, X-Device-Id, Cookie headers)
+```
 
 ### Breaking Changes
-- **Linux support removed** - Target platforms now macOS + Windows only
-- **Static Client-ID deprecated** - All GQL calls now require harvested integrity tokens
-
-### Technical Debt
-- Replace all `print()` statements with `AppLogger`
-- Centralize User-Agent string (currently duplicated in 3 files)
+- Video playback now requires integrity tokens (harvested automatically on startup)
+- All player widgets must receive session from `integritySessionProvider`
 
 ---
 

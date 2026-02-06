@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:smart_twitch_flutter/models/twitch_session.dart';
+import 'package:smart_twitch_flutter/utils/browser_constants.dart';
 
 /// Controller wrapper that exposes video player controls
 class TwitchPlayerController {
@@ -48,11 +50,16 @@ class TwitchVideoWidget extends StatefulWidget {
   final bool hasAudio;
   final void Function(TwitchPlayerController controller)? onControllerReady;
   
+  /// Integrity session for authenticated playback.
+  /// If provided, the player will include Client-Integrity and Cookie headers.
+  final TwitchSession? integritySession;
+  
   const TwitchVideoWidget({
     super.key,
     required this.hlsUrl,
     this.hasAudio = true,
     this.onControllerReady,
+    this.integritySession,
   });
 
   @override
@@ -74,13 +81,37 @@ class _TwitchVideoWidgetState extends State<TwitchVideoWidget> {
   }
   
   Future<void> _initializePlayer() async {
-    print('[VideoWidget] Initializing player with URL: ${widget.hlsUrl.substring(0, 80)}...');
+    print('[VideoWidget] Initializing player with URL: '
+        '${widget.hlsUrl.substring(0, 80)}...');
+    
+    // Build HTTP headers - MUST match the harvester User-Agent exactly
+    final headers = <String, String>{
+      'User-Agent': kBrowserUserAgent,
+    };
+    
+    // Add integrity headers if session is available
+    if (widget.integritySession != null) {
+      final session = widget.integritySession!;
+      headers['Client-ID'] = session.clientId;
+      headers['Client-Integrity'] = session.integrityToken;
+      headers['X-Device-Id'] = session.deviceId;
+      
+      if (session.authorization != null) {
+        headers['Authorization'] = session.authorization!;
+      }
+      
+      if (session.cookieString.isNotEmpty) {
+        headers['Cookie'] = session.cookieString;
+      }
+      
+      print('[VideoWidget] Using integrity session for playback');
+    } else {
+      print('[VideoWidget] No integrity session - playback may fail');
+    }
     
     _controller = VideoPlayerController.networkUrl(
       Uri.parse(widget.hlsUrl),
-      httpHeaders: const {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      },
+      httpHeaders: headers,
     );
     
     try {

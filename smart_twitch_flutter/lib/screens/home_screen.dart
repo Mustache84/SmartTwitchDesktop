@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/stream_preview.dart';
-import '../models/category_preview.dart';
-import '../services/twitch_browse_service.dart';
-import '../services/preview_player_manager.dart';
-import '../state/auth_provider.dart';
-import '../core/core.dart';
-import '../widgets/collapsible_sidebar.dart';
-import '../widgets/stream_preview_card.dart';
-import '../widgets/category_card.dart';
-import 'player_screen.dart';
-import 'login_screen.dart';
+import 'package:smart_twitch_flutter/models/stream_preview.dart';
+import 'package:smart_twitch_flutter/models/category_preview.dart';
+import 'package:smart_twitch_flutter/services/twitch_browse_service.dart';
+import 'package:smart_twitch_flutter/services/preview_player_manager.dart';
+import 'package:smart_twitch_flutter/state/auth_provider.dart';
+import 'package:smart_twitch_flutter/state/integrity_provider.dart';
+import 'package:smart_twitch_flutter/core/core.dart';
+import 'package:smart_twitch_flutter/widgets/collapsible_sidebar.dart';
+import 'package:smart_twitch_flutter/widgets/stream_preview_card.dart';
+import 'package:smart_twitch_flutter/widgets/category_card.dart';
+import 'package:smart_twitch_flutter/screens/player_screen.dart';
+import 'package:smart_twitch_flutter/screens/login_screen.dart';
 
 /// Main home screen with featured streams and categories
 /// 
@@ -78,7 +79,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         
         // Pre-initialize ALL video controllers for instant previews
         // This runs in background - streams appear first, then become "ready"
-        _previewManager.preloadAllStreams(streams);
+        _previewManager.preloadAllStreams(
+          streams,
+          session: ref.read(integritySessionProvider),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -129,7 +133,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     // When returning from player, reload the previews
     if (mounted && _featuredStreams.isNotEmpty) {
-      _previewManager.preloadAllStreams(_featuredStreams);
+      _previewManager.preloadAllStreams(
+        _featuredStreams,
+        session: ref.read(integritySessionProvider),
+      );
     }
   }
   

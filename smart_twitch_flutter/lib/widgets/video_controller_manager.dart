@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:smart_twitch_flutter/models/twitch_session.dart';
+import 'package:smart_twitch_flutter/state/integrity_provider.dart';
+import 'package:smart_twitch_flutter/utils/browser_constants.dart';
 
 /// Manages video player controllers keyed by channel name
 /// This allows streams to persist when slots are rearranged
@@ -20,7 +23,13 @@ class VideoControllerManager {
   final Set<String> _cancelled = {};
   
   /// Get or create a controller for a channel
-  Future<VideoPlayerController> getController(String channelLogin, String hlsUrl) async {
+  /// 
+  /// If [session] is provided, the controller will include integrity headers.
+  Future<VideoPlayerController> getController(
+    String channelLogin,
+    String hlsUrl, {
+    TwitchSession? session,
+  }) async {
     // Check if cancelled
     if (_cancelled.contains(channelLogin)) {
       _cancelled.remove(channelLogin);
@@ -39,11 +48,33 @@ class VideoControllerManager {
     try {
       print('[VideoManager] Creating controller for $channelLogin');
       
+      // Build HTTP headers - MUST match the harvester User-Agent exactly
+      final headers = <String, String>{
+        'User-Agent': kBrowserUserAgent,
+      };
+      
+      // Add integrity headers if session is available
+      if (session != null) {
+        headers['Client-ID'] = session.clientId;
+        headers['Client-Integrity'] = session.integrityToken;
+        headers['X-Device-Id'] = session.deviceId;
+        
+        if (session.authorization != null) {
+          headers['Authorization'] = session.authorization!;
+        }
+        
+        if (session.cookieString.isNotEmpty) {
+          headers['Cookie'] = session.cookieString;
+        }
+        
+        print('[VideoManager] 🔐 Using integrity session for $channelLogin');
+      } else {
+        print('[VideoManager] ⚠️ No integrity session - playback may fail');
+      }
+      
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(hlsUrl),
-        httpHeaders: const {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        },
+        httpHeaders: headers,
       );
       
       await controller.initialize();
@@ -168,6 +199,7 @@ class _PersistentVideoWidgetState extends ConsumerState<PersistentVideoWidget> {
   
   Future<void> _initializePlayer() async {
     final manager = ref.read(videoManagerProvider);
+    final session = ref.read(integritySessionProvider);
     
     // Check if controller already exists
     final existing = manager.getExistingController(widget.channelLogin);
@@ -190,7 +222,11 @@ class _PersistentVideoWidgetState extends ConsumerState<PersistentVideoWidget> {
     }
     
     try {
-      final controller = await manager.getController(widget.channelLogin, widget.hlsUrl);
+      final controller = await manager.getController(
+        widget.channelLogin,
+        widget.hlsUrl,
+        session: session,
+      );
       // Check if disposed during async operation
       if (_disposed) {
         // Widget was disposed while we were initializing - clean up the controller

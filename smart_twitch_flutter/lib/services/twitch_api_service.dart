@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
-import 'token_manager.dart';
-import '../config/twitch_constants.dart';
+import 'package:smart_twitch_flutter/models/twitch_session.dart';
+import 'package:smart_twitch_flutter/services/token_manager.dart';
+import 'package:smart_twitch_flutter/services/twitch_integrity_service.dart';
+import 'package:smart_twitch_flutter/config/twitch_constants.dart';
+import 'package:smart_twitch_flutter/utils/browser_constants.dart';
 
 class PlaybackToken {
   final String token;
@@ -27,15 +30,21 @@ class TwitchApiException implements Exception {
 class TwitchApiService {
   final Dio _dio;
   final TokenManager _tokenManager = TokenManager();
+  final TwitchIntegrityService _integrityService;
   
   // Port from PlayHLS.js: Play_live_token - MUST be single-line compact JSON
   static const _liveTokenQueryTemplate = 
       '{"extensions":{"persistedQuery":{"sha256Hash":"ed230aa1e33e07eebb8928504583da78a5173989fadfb1ac94be06a04f3cdbe9","version":1}},"operationName":"PlaybackAccessToken","variables":{"isLive":true,"isVod":false,"login":"%LOGIN%","platform":"web","playerType":"site","vodID":""}}';
+
+  /// Maximum number of retry attempts for 403 errors
+  static const int _maxRetries = 2;
   
-  TwitchApiService() : _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
-  )) {
+  TwitchApiService({TwitchIntegrityService? integrityService}) 
+      : _integrityService = integrityService ?? TwitchIntegrityService(),
+        _dio = Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        )) {
     // Add logging interceptor for debugging
     _dio.interceptors.add(LogInterceptor(
       requestHeader: true,
@@ -46,6 +55,12 @@ class TwitchApiService {
     ));
   }
   
+  /// Get the integrity service (for sharing with other services)
+  TwitchIntegrityService get integrityService => _integrityService;
+  
+  /// Get the current integrity session, or null if not ready
+  TwitchSession? get currentSession => _integrityService.currentSession;
+  
   /// Check if user is authenticated
   Future<bool> isAuthenticated() async {
     return await _tokenManager.isAuthenticated();
@@ -54,26 +69,62 @@ class TwitchApiService {
   /// Fetches playback access token for a live channel
   /// Port of PlayHLS_GetToken() from PlayHLS.js
   ///
-  /// Uses the registered OAuth client ID for all requests.
+  /// Now uses integrity headers harvested from the headless browser.
   /// If authenticated, includes Bearer token for subscriber features.
   Future<PlaybackToken> getPlaybackToken(String channelLogin) async {
-    final query = _liveTokenQueryTemplate.replaceAll('%LOGIN%', channelLogin.toLowerCase());
+    return _getPlaybackTokenWithRetry(channelLogin, retryCount: 0);
+  }
 
-    // Check if user is authenticated
+  /// Internal implementation with retry logic for 403 errors
+  Future<PlaybackToken> _getPlaybackTokenWithRetry(
+    String channelLogin, {
+    required int retryCount,
+  }) async {
+    final query = _liveTokenQueryTemplate.replaceAll(
+      '%LOGIN%',
+      channelLogin.toLowerCase(),
+    );
+
+    // Get integrity session (this may trigger harvest if not ready)
+    TwitchSession? session;
+    try {
+      session = await _integrityService.getSession();
+    } catch (e) {
+      print('[API] ❌ Integrity service error: $e');
+      // Fall back to static client ID if integrity fails
+    }
+
+    // Check if user is authenticated (OAuth token)
     final accessToken = await _tokenManager.getValidToken();
 
-    // GraphQL requires "blessed" client ID (not our OAuth client ID)
-    final headers = {
-      'Client-ID': twitchGqlClientId,
+    // Build headers - prefer integrity headers if available
+    final headers = <String, String>{
       'Content-Type': 'application/json',
+      'User-Agent': kBrowserUserAgent,
     };
 
+    if (session != null) {
+      // Use integrity headers
+      headers['Client-ID'] = session.clientId;
+      headers['Client-Integrity'] = session.integrityToken;
+      headers['X-Device-Id'] = session.deviceId;
+      print('[API] 🔐 Using harvested token: ${session.clientId.substring(0, 5)}... for $channelLogin');
+    } else {
+      // Fall back to static client ID (may fail with 403)
+      headers['Client-ID'] = twitchGqlClientId;
+      print('[API] ⚠️ WARNING: Using static Client-ID (no integrity)');
+    }
+
     // Add auth token if available (for subscriber features)
+    // Prefer the OAuth token over the session authorization
     if (accessToken != null) {
       headers['Authorization'] = 'Bearer $accessToken';
-      print('[TwitchApiService] Using authenticated request for $channelLogin');
+      print('[API] 👤 Using authenticated request for $channelLogin');
+    } else if (session?.authorization != null) {
+      headers['Authorization'] = session!.authorization!;
+      print('[API] 👤 Using session auth for $channelLogin');
     } else {
-      print('[TwitchApiService] Using anonymous request for $channelLogin');
+      print('[API] 👻 Using anonymous request for $channelLogin');
     }
 
     try {
@@ -85,12 +136,29 @@ class TwitchApiService {
 
       if (response.statusCode == 200) {
         final token = _parsePlaybackToken(response.data, channelLogin);
-        print('[TwitchApiService] Successfully got playback token for $channelLogin');
+        print('[API] ✅ Playback token success for $channelLogin');
         return token;
       }
 
-      throw TwitchApiException('Unexpected status code: ${response.statusCode}');
+      throw TwitchApiException(
+        'Unexpected status code: ${response.statusCode}',
+      );
     } on DioException catch (e) {
+      // Handle 403 Forbidden - integrity token may be expired
+      if (e.response?.statusCode == 403 && retryCount < _maxRetries) {
+        print('[API] ⚠️ 403 Forbidden - Triggering re-harvest '
+            '(attempt ${retryCount + 1}/$_maxRetries)');
+        
+        // Force refresh the integrity session
+        await _integrityService.refresh();
+        
+        // Retry with new session
+        return _getPlaybackTokenWithRetry(
+          channelLogin,
+          retryCount: retryCount + 1,
+        );
+      }
+
       throw TwitchApiException(
         'Failed to get playback token: ${e.message}',
         statusCode: e.response?.statusCode,

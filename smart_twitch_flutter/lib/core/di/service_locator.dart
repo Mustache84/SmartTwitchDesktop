@@ -1,4 +1,4 @@
-import 'package:get_it/get_it.dart';
+import 'package:get_it/get_it.dart' hide Disposable;
 import 'package:smart_twitch_flutter/core/interfaces/disposable.dart';
 import 'package:smart_twitch_flutter/services/hls_manifest_service.dart';
 import 'package:smart_twitch_flutter/services/low_latency_service.dart';
@@ -8,6 +8,7 @@ import 'package:smart_twitch_flutter/services/token_manager.dart';
 import 'package:smart_twitch_flutter/services/twitch_api_service.dart';
 import 'package:smart_twitch_flutter/services/twitch_auth_service.dart';
 import 'package:smart_twitch_flutter/services/twitch_browse_service.dart';
+import 'package:smart_twitch_flutter/services/twitch_integrity_service.dart';
 
 /// Global GetIt instance for dependency injection.
 final GetIt sl = GetIt.instance;
@@ -65,11 +66,20 @@ class ServiceLocator {
     );
 
     // =========================================================================
+    // INTEGRITY SERVICE (Must be before API services)
+    // =========================================================================
+
+    sl.registerLazySingleton<TwitchIntegrityService>(
+      () => TwitchIntegrityService(),
+      dispose: (service) => service.dispose(),
+    );
+
+    // =========================================================================
     // API SERVICES
     // =========================================================================
 
     sl.registerLazySingleton<TwitchApiService>(
-      () => TwitchApiService(),
+      () => TwitchApiService(integrityService: sl<TwitchIntegrityService>()),
     );
 
     sl.registerLazySingleton<TwitchBrowseService>(
@@ -133,6 +143,16 @@ class ServiceLocator {
       final service = sl<LowLatencyService>();
       if (service is Disposable) {
         disposables.add(service as Disposable);
+      }
+    }
+
+    // Dispose TwitchIntegrityService (not Disposable but has dispose method)
+    if (sl.isRegistered<TwitchIntegrityService>()) {
+      try {
+        await sl<TwitchIntegrityService>().dispose();
+      } catch (e) {
+        // ignore: avoid_print
+        print('[ServiceLocator] Error disposing TwitchIntegrityService: $e');
       }
     }
 

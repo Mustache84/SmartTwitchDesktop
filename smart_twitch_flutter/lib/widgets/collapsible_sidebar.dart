@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_twitch_flutter/widgets/debug/integrity_status_indicator.dart';
 import '../core/core.dart';
 
 /// Collapsible sidebar that slides over content
 /// 
 /// Expands on mouse enter, collapses on mouse leave.
 /// Animation is kept snappy per UIUX requirements.
-class CollapsibleSidebar extends StatefulWidget {
+class CollapsibleSidebar extends ConsumerStatefulWidget {
   final bool isLoggedIn;
   final String? username;
   final String? avatarUrl;
@@ -28,10 +30,10 @@ class CollapsibleSidebar extends StatefulWidget {
   });
 
   @override
-  State<CollapsibleSidebar> createState() => _CollapsibleSidebarState();
+  ConsumerState<CollapsibleSidebar> createState() => _CollapsibleSidebarState();
 }
 
-class _CollapsibleSidebarState extends State<CollapsibleSidebar> 
+class _CollapsibleSidebarState extends ConsumerState<CollapsibleSidebar> 
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _widthAnimation;
@@ -118,6 +120,12 @@ class _CollapsibleSidebarState extends State<CollapsibleSidebar>
                 ),
                 
                 const Spacer(),
+                
+                // Integrity status indicator (debug only)
+                const IntegrityStatusIndicator(
+                  debugModeOnly: true,
+                  size: 10,
+                ),
                 
                 const Divider(color: Colors.white12, height: 1),
                 const SizedBox(height: 8),

@@ -2,13 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/twitch_api_service.dart';
-import '../services/low_latency_service.dart';
-import '../utils/hls_url_builder.dart';
-import '../core/core.dart';
-import '../widgets/video_widget.dart';
-import '../widgets/quality_selector.dart';
-import '../widgets/latency_slider.dart';
+import 'package:smart_twitch_flutter/services/twitch_api_service.dart';
+import 'package:smart_twitch_flutter/services/low_latency_service.dart';
+import 'package:smart_twitch_flutter/state/integrity_provider.dart';
+import 'package:smart_twitch_flutter/utils/hls_url_builder.dart';
+import 'package:smart_twitch_flutter/core/core.dart';
+import 'package:smart_twitch_flutter/widgets/video_widget.dart';
+import 'package:smart_twitch_flutter/widgets/quality_selector.dart';
+import 'package:smart_twitch_flutter/widgets/latency_slider.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final String channelLogin;
@@ -229,6 +230,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               child: TwitchVideoWidget(
                 hlsUrl: _hlsUrl!,
                 onControllerReady: _onControllerReady,
+                integritySession: ref.watch(integritySessionProvider),
               ),
             ),
             // Top bar overlay

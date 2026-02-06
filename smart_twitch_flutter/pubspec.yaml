@@ -35,6 +35,9 @@ dependencies:
   # Dependency Injection
   get_it: ^8.0.3
   
+  # WebView for Integrity Token Harvesting (Desktop)
+  flutter_inappwebview: ^6.1.5
+  
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
